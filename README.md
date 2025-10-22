@@ -33,7 +33,7 @@ Unity 上で VISCA 互換コマンドにより仮想 PTZ カメラを制御す�
   - `transport`（`UdpRawVisca`/`TcpRawVisca`/`Both`）、`udpPort`、`tcpPort`、`replyMode`、`maxClients` を設定
   - 内部で純 C# の `ViscaServerCore` を起動し、`PtzViscaHandler` を介して PTZ を適用
 
-## 純 C# コア
+## Pure C# コア
 - `PtzModel` — PTZ 状態・コマンド・ステップ更新（MonoBehaviour 非依存）
 - `ViscaServerCore` — UDP/TCP 受信・フレーミング・パース（MonoBehaviour 非依存）
 - `PtzViscaHandler` — VISCA コマンドを `PtzModel` に橋渡し
