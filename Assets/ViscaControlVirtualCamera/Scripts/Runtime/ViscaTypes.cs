@@ -5,7 +5,9 @@ namespace ViscaControlVirtualCam
     public enum ViscaTransport
     {
         UdpRawVisca,
-        // Future: SonyViscaOverIp, TcpRawVisca
+        TcpRawVisca,
+        Both,
+        // Future: SonyViscaOverIp
     }
 
     public enum ViscaReplyMode
@@ -32,4 +34,3 @@ namespace ViscaControlVirtualCam
         All = Pan | Tilt | Zoom
     }
 }
-
