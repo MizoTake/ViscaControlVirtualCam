@@ -246,7 +246,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   autoStart: 1
-  transport: 0
+  transport: 2
   udpPort: 52381
   tcpPort: 52380
   maxClients: 4

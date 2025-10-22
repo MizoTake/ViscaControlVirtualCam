@@ -13,6 +13,7 @@ namespace ViscaControlVirtualCam
         public int MaxClients = 4;
         public bool VerboseLog = true;
         public Action<string> Logger = null; // optional
+        public int MaxFrameSize = 4096; // guard for malformed streams
     }
 
     // Pure C# server core. No Unity/MonoBehaviour dependencies.
@@ -23,6 +24,8 @@ namespace ViscaControlVirtualCam
         private UdpClient _udp;
         private TcpListener _tcp;
         private CancellationTokenSource _cts;
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<TcpClient, ViscaFrameFramer> _clients = new();
+        private int _clientCount = 0;
 
         public ViscaServerCore(IViscaCommandHandler handler, ViscaServerOptions options)
         {
@@ -48,6 +51,12 @@ namespace ViscaControlVirtualCam
             _udp = null;
             _tcp = null;
             _cts = null;
+            foreach (var kv in _clients)
+            {
+                try { kv.Key.Close(); } catch { }
+            }
+            _clients.Clear();
+            System.Threading.Interlocked.Exchange(ref _clientCount, 0);
         }
 
         private void StartUdp()
@@ -88,7 +97,15 @@ namespace ViscaControlVirtualCam
                 try
                 {
                     var client = _tcp.AcceptTcpClient();
+                    if (System.Threading.Interlocked.Increment(ref _clientCount) > _opt.MaxClients)
+                    {
+                        Log("TCP client refused: max clients reached");
+                        System.Threading.Interlocked.Decrement(ref _clientCount);
+                        try { client.Close(); } catch { }
+                        continue;
+                    }
                     client.NoDelay = true;
+                    _clients[client] = new ViscaFrameFramer(_opt.MaxFrameSize);
                     ThreadPool.QueueUserWorkItem(_ => ClientLoopTcp(client));
                 }
                 catch (SocketException)
@@ -104,25 +121,32 @@ namespace ViscaControlVirtualCam
             using (client)
             using (var stream = client.GetStream())
             {
-                var buffer = new byte[4096];
-                var acc = new System.IO.MemoryStream();
+                var buffer = new byte[8192];
                 Action<byte[]> send = (bytes) => { try { stream.Write(bytes, 0, bytes.Length); stream.Flush(); } catch { } };
                 while (_cts != null && !_cts.IsCancellationRequested && client.Connected)
                 {
                     int n; try { n = stream.Read(buffer, 0, buffer.Length); } catch { break; }
                     if (n <= 0) break;
-                    acc.Write(buffer, 0, n);
-                    while (true)
+                    if (_clients.TryGetValue(client, out var framer))
                     {
-                        var data = acc.ToArray();
-                        int idx = Array.IndexOf(data, (byte)0xFF);
-                        if (idx < 0) break;
-                        var frame = new byte[idx + 1]; Array.Copy(data, frame, idx + 1);
-                        var remain = new byte[data.Length - (idx + 1)]; Array.Copy(data, idx + 1, remain, 0, remain.Length);
-                        acc.SetLength(0); acc.Write(remain, 0, remain.Length);
-                        ProcessFrame(frame, send);
+                        int before = 0;
+                        framer.Append(new ReadOnlySpan<byte>(buffer, 0, n), frame =>
+                        {
+                            if (frame.Length > _opt.MaxFrameSize)
+                            {
+                                Log($"TCP frame too large: {frame.Length}");
+                                return; // drop
+                            }
+                            ProcessFrame(frame, send);
+                        });
+                    }
+                    else
+                    {
+                        // No framer state; drop
                     }
                 }
+                _clients.TryRemove(client, out _);
+                System.Threading.Interlocked.Decrement(ref _clientCount);
             }
         }
 
@@ -135,11 +159,18 @@ namespace ViscaControlVirtualCam
                 _handler.HandleSyntaxError(frame, send);
                 return;
             }
+            if (frame.Length > _opt.MaxFrameSize)
+            {
+                Log($"Frame too large: {frame.Length}");
+                return;
+            }
             if (ViscaParser.TryParsePanTiltDrive(frame, out var vv, out var ww, out var pp, out var tt)) { _handler.HandlePanTiltDrive(vv, ww, pp, tt, send); return; }
             if (ViscaParser.TryParseZoomVariable(frame, out var zz)) { _handler.HandleZoomVariable(zz, send); return; }
             if (ViscaParser.TryParsePanTiltAbsolute(frame, out var avv, out var aww, out var panPos, out var tiltPos)) { _handler.HandlePanTiltAbsolute(avv, aww, panPos, tiltPos, send); return; }
-            Log($"Unsupported VISCA command: {BitConverter.ToString(frame)}");
-            _handler.HandleSyntaxError(frame, send);
+            // Known but unsupported commands: log what came in, do not apply to camera.
+            var name = ViscaParser.GetCommandName(frame);
+            Log($"Ignored VISCA command: {name} frame={BitConverter.ToString(frame)}");
+            // Intentionally no error; we just log.
         }
 
         private void Log(string msg)
@@ -150,4 +181,3 @@ namespace ViscaControlVirtualCam
         public void Dispose() => Stop();
     }
 }
-

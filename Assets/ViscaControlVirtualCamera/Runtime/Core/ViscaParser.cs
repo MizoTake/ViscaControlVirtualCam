@@ -31,14 +31,28 @@ namespace ViscaControlVirtualCam
         public static bool TryParsePanTiltAbsolute(byte[] frame, out byte vv, out byte ww, out ushort pan, out ushort tilt)
         {
             vv = ww = 0; pan = tilt = 0;
-            // 8X 01 06 02 VV WW p1 p2 p3 p4 t1 t2 t3 t4 FF
-            if (frame == null || frame.Length < 14) return false;
+            // 8X 01 06 02 [VV WW] p1 p2 p3 p4 t1 t2 t3 t4 FF
+            if (frame == null || frame.Length < 12) return false;
             if (frame[1] != 0x01 || frame[2] != 0x06 || frame[3] != 0x02) return false;
-            vv = frame[4];
-            ww = frame[5];
-            pan = DecodeNibble16(frame[6], frame[7], frame[8], frame[9]);
-            tilt = DecodeNibble16(frame[10], frame[11], frame[12], frame[13]);
+            int idx = 4;
+            if (frame.Length >= 14) // speeds present
+            {
+                vv = frame[idx++];
+                ww = frame[idx++];
+            }
+            pan = DecodeNibble16(frame[idx + 0], frame[idx + 1], frame[idx + 2], frame[idx + 3]);
+            tilt = DecodeNibble16(frame[idx + 4], frame[idx + 5], frame[idx + 6], frame[idx + 7]);
             return frame[^1] == 0xFF;
+        }
+
+        public static string GetCommandName(byte[] frame)
+        {
+            if (frame == null || frame.Length < 5) return "Invalid";
+            byte b1 = frame[1], b2 = frame[2], b3 = frame[3];
+            if (b1 == 0x01 && b2 == 0x06 && b3 == 0x01) return "PanTiltDrive";
+            if (b1 == 0x01 && b2 == 0x06 && b3 == 0x02) return "PanTiltAbsolute";
+            if (b1 == 0x01 && b2 == 0x04 && b3 == 0x07) return "ZoomVariable";
+            return $"Unknown({b1:X2} {b2:X2} {b3:X2})";
         }
 
         public static ushort DecodeNibble16(byte n1, byte n2, byte n3, byte n4)
@@ -64,4 +78,3 @@ namespace ViscaControlVirtualCam
         }
     }
 }
-
