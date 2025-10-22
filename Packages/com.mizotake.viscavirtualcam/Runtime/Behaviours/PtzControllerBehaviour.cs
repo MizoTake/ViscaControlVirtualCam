@@ -9,21 +9,7 @@ namespace ViscaControlVirtualCam
         public Transform tiltPivot; // pitch
         public Camera targetCamera; // FOV
 
-        [Header("Motion Limits")] public float panMaxDegPerSec = 120f;
-        public float tiltMaxDegPerSec = 90f;
-        public float zoomMaxFovPerSec = 40f;
-        public float minFov = 15f;
-        public float maxFov = 90f;
-
-        [Header("Absolute Ranges")] public float panMinDeg = -170f;
-        public float panMaxDeg = 170f;
-        public float tiltMinDeg = -30f;
-        public float tiltMaxDeg = 90f;
-        public float moveDamping = 6f;
-
-        [Header("Speed Mapping")] [Range(0.1f, 3f)] public float speedGamma = 1.0f;
-        public byte panVmin = 0x01, panVmax = 0x18;
-        public byte tiltVmin = 0x01, tiltVmax = 0x14;
+        [Header("Settings Preset")] public PtzSettings settings;
 
         private PtzModel _model;
         public PtzModel Model => _model;
@@ -34,25 +20,20 @@ namespace ViscaControlVirtualCam
             if (tiltPivot == null) tiltPivot = transform;
             if (targetCamera == null) targetCamera = GetComponentInChildren<Camera>();
 
-            _model = new PtzModel
-            {
-                PanMaxDegPerSec = panMaxDegPerSec,
-                TiltMaxDegPerSec = tiltMaxDegPerSec,
-                ZoomMaxFovPerSec = zoomMaxFovPerSec,
-                MinFov = minFov,
-                MaxFov = maxFov,
-                PanMinDeg = panMinDeg,
-                PanMaxDeg = panMaxDeg,
-                TiltMinDeg = tiltMinDeg,
-                TiltMaxDeg = tiltMaxDeg,
-                MoveDamping = moveDamping,
-                SpeedGamma = speedGamma,
-                PanVmin = panVmin,
-                PanVmax = panVmax,
-                TiltVmin = tiltVmin,
-                TiltVmax = tiltVmax
-            };
+            _model = new PtzModel();
+            ApplySettings();
         }
+
+#if UNITY_EDITOR
+        private void OnValidate()
+        {
+            if (!Application.isPlaying)
+            {
+                if (_model == null) _model = new PtzModel();
+                ApplySettings();
+            }
+        }
+#endif
 
         private void Update()
         {
@@ -69,6 +50,15 @@ namespace ViscaControlVirtualCam
                 tiltPivot.Rotate(-step.DeltaPitchDeg, 0f, 0f, Space.Self);
             if (step.HasNewFov && targetCamera != null)
                 targetCamera.fieldOfView = step.NewFovDeg;
+        }
+
+        [ContextMenu("Apply Settings Now")]
+        public void ApplySettings()
+        {
+            if (settings != null)
+            {
+                settings.ApplyTo(_model);
+            }
         }
 
         private static float NormalizeAngle(float euler)

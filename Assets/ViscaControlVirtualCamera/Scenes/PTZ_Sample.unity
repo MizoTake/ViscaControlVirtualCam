@@ -507,21 +507,7 @@ MonoBehaviour:
   panPivot: {fileID: 1474640885}
   tiltPivot: {fileID: 267442196}
   targetCamera: {fileID: 838327174}
-  panMaxDegPerSec: 120
-  tiltMaxDegPerSec: 90
-  zoomMaxFovPerSec: 40
-  minFov: 15
-  maxFov: 90
-  panMinDeg: -170
-  panMaxDeg: 170
-  tiltMinDeg: -30
-  tiltMaxDeg: 90
-  moveDamping: 6
-  speedGamma: 1
-  panVmin: 1
-  panVmax: 24
-  tiltVmin: 1
-  tiltVmax: 20
+  settings: {fileID: 11400000, guid: ab193120e59bb9146bf48dfec2b1728e, type: 2}
 --- !u!4 &1474640885
 Transform:
   m_ObjectHideFlags: 0

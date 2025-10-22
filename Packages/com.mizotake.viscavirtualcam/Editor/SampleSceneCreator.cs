@@ -43,6 +43,13 @@ namespace ViscaControlVirtualCam.Editor
             controller.tiltPivot = tilt;
             controller.targetCamera = cam;
 
+            // Create PTZ settings asset (preset) under Assets and assign
+            // Ensure default and sample presets exist
+            PtzPresetCreator.CreatePresets();
+            var defaultPath = "Assets/ViscaControlVirtualCamera/Presets/PTZ_Outdoor.asset";
+            var defaultSettings = AssetDatabase.LoadAssetAtPath<PtzSettings>(defaultPath);
+            controller.settings = defaultSettings != null ? defaultSettings : AssetDatabase.LoadAssetAtPath<PtzSettings>("Assets/ViscaControlVirtualCamera/Presets/PTZ_Indoor.asset");
+
             // Add server behaviour object
             var serverGo = new GameObject("VISCA Server");
             var server = serverGo.AddComponent<ViscaServerBehaviour>();
