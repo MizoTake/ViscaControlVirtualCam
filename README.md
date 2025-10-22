@@ -2,6 +2,9 @@
 
 Unity 上で VISCA 互換コマンドにより仮想 PTZ カメラを制御する最小実装です。Pan/Tilt は Transform 回転、Zoom は Camera の FOV で表現します。サンプルシーン生成と、ACK/Completion を返す UDP/TCP Raw VISCA サーバーを含みます。
 
+本リポジトリは UPM（Unity Package Manager）対応の埋め込みパッケージを同梱しています。
+パッケージ名: `com.mizotake.viscavirtualcam`（`Packages/com.mizotake.viscavirtualcam`）。
+
 ## 要件
 - Unity 2022.3 LTS（検証: `2022.3.62f2`）
 - クライアントから UDP 52381 / TCP 52380 へ到達可能
@@ -35,6 +38,14 @@ Unity 上で VISCA 互換コマンドにより仮想 PTZ カメラを制御す�
 - `ViscaServerCore` — UDP/TCP 受信・フレーミング・パース（MonoBehaviour 非依存）
 - `PtzViscaHandler` — VISCA コマンドを `PtzModel` に橋渡し
 
+## UPM インストール方法
+- 埋め込み（同梱）: 本プロジェクトでは `Packages/com.mizotake.viscavirtualcam` が既に含まれています。
+- 外部プロジェクトへ導入:
+  - Unity メニューの「Window > Package Manager」→「+」→「Add package from disk...」で、本リポジトリ内の `Packages/com.mizotake.viscavirtualcam/package.json` を指定。
+  - または Git URL を指定して追加（Git リモート公開時）。
+    - 例（ブランチ指定）: `https://github.com/MizoTake/ViscaControlVirtualCam.git?path=Packages/com.mizotake.viscavirtualcam#main`
+    - 例（タグ指定）: `https://github.com/MizoTake/ViscaControlVirtualCam.git?path=Packages/com.mizotake.viscavirtualcam#0.1.0`
+
 ## ビルド
 - Editor: File → Build Settings → Build
 - CLI: 必要なら `BuildScript.BuildStandalone` を用意
@@ -44,4 +55,13 @@ Unity 上で VISCA 互換コマンドにより仮想 PTZ カメラを制御す�
 - 軸定義: Pan=yaw（右+）、Tilt=pitch（上+）。Tele=FOV 減少、Wide=増加
 
 ## 仕様参照
-- `Assets/ViscaControlVirtualCamera/Docs/` を参照（VISCA/PTZ 詳細）
+- パッケージ内 `Packages/com.mizotake.viscavirtualcam/Documentation~` を参照（VISCA/PTZ 詳細）
+
+## 外部リンク（Git 公開時）
+- Repository: https://github.com/MizoTake/ViscaControlVirtualCam
+- Documentation: https://github.com/MizoTake/ViscaControlVirtualCam/tree/main/Packages/com.mizotake.viscavirtualcam/Documentation~
+- Changelog: https://github.com/MizoTake/ViscaControlVirtualCam/blob/main/Packages/com.mizotake.viscavirtualcam/CHANGELOG.md
+
+
+
+

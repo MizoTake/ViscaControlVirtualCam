@@ -1,0 +1,33 @@
+﻿{
+  "name": "com.mizotake.viscavirtualcam",
+  "displayName": "VISCA Control Virtual Camera",
+  "version": "0.1.0",
+  "unity": "2022.3",
+  "type": "library",
+  "hideInEditor": false,
+  "description": "Minimal VISCA-compatible PTZ virtual camera server for Unity. UDP/TCP Raw VISCA, PT drive, zoom, absolute PT, with pure C# core and thin behaviours.",
+  "keywords": ["VISCA", "PTZ", "camera", "UDP", "TCP"],
+  "category": "Cameras",
+  "author": {
+    "name": "com.mizotake.viscavirtualcam"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/MizoTake/ViscaControlVirtualCam.git"
+  },
+  "homepage": "https://github.com/MizoTake/ViscaControlVirtualCam",
+  "bugs": {
+    "url": "https://github.com/MizoTake/ViscaControlVirtualCam/issues"
+  },
+  "documentationUrl": "https://github.com/MizoTake/ViscaControlVirtualCam/tree/main/Packages/com.mizotake.viscavirtualcam/Documentation~",
+  "changelogUrl": "https://github.com/MizoTake/ViscaControlVirtualCam/blob/main/Packages/com.mizotake.viscavirtualcam/CHANGELOG.md",
+  "licensesUrl": "https://github.com/MizoTake/ViscaControlVirtualCam#license",
+  "samples": [
+    {
+      "displayName": "PTZ Sample Scene (Generator)",
+      "description": "Editor menu to generate a ready-to-run PTZ sample scene.",
+      "path": "Samples~\/PTZSample"
+    }
+  ]
+}
+
