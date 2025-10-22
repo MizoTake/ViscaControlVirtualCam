@@ -37,16 +37,16 @@ namespace ViscaControlVirtualCam.Editor
             cam.transform.localRotation = Quaternion.identity;
             cam.fieldOfView = 60f;
 
-            // Add controller to rig
-            var controller = rig.AddComponent<PtzController>();
+            // Add controller behaviour to rig
+            var controller = rig.AddComponent<PtzControllerBehaviour>();
             controller.panPivot = pan;
             controller.tiltPivot = tilt;
             controller.targetCamera = cam;
 
-            // Add server object
+            // Add server behaviour object
             var serverGo = new GameObject("VISCA Server");
-            var server = serverGo.AddComponent<ViscaServer>();
-            server.ptz = controller;
+            var server = serverGo.AddComponent<ViscaServerBehaviour>();
+            server.ptzController = controller;
             server.autoStart = true;
             server.udpPort = 52381;
 
@@ -65,4 +65,3 @@ namespace ViscaControlVirtualCam.Editor
     }
 }
 #endif
-
