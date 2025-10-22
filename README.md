@@ -20,6 +20,8 @@ Unity 上で VISCA 互換コマンドにより仮想 PTZ カメラを制御す�
   - Zoom Var: `81 01 04 07 ZZ FF`（`ZZ=2p:Tele, 3p:Wide, p=0..7, 00=Stop`）
   - PT Absolute: `81 01 06 02 VV WW p1 p2 p3 p4 t1 t2 t3 t4 FF`
 
+- コントローラーには [ViscaCamLink](https://github.com/misorrek/ViscaCamLink)を使用
+
 ## コンポーネント
 - `PtzControllerBehaviour`（呼び出し側 MonoBehaviour）
   - `panPivot`/`tiltPivot`、`targetCamera` を指定
