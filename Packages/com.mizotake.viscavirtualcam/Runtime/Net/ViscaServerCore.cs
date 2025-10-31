@@ -164,9 +164,20 @@ namespace ViscaControlVirtualCam
                 Log($"Frame too large: {frame.Length}");
                 return;
             }
+            // Standard VISCA commands
             if (ViscaParser.TryParsePanTiltDrive(frame, out var vv, out var ww, out var pp, out var tt)) { _handler.HandlePanTiltDrive(vv, ww, pp, tt, send); return; }
             if (ViscaParser.TryParseZoomVariable(frame, out var zz)) { _handler.HandleZoomVariable(zz, send); return; }
             if (ViscaParser.TryParsePanTiltAbsolute(frame, out var avv, out var aww, out var panPos, out var tiltPos)) { _handler.HandlePanTiltAbsolute(avv, aww, panPos, tiltPos, send); return; }
+
+            // Blackmagic PTZ Control extended commands
+            if (ViscaParser.TryParseZoomDirect(frame, out var zoomPos)) { _handler.HandleZoomDirect(zoomPos, send); return; }
+            if (ViscaParser.TryParseFocusVariable(frame, out var focusSpeed)) { _handler.HandleFocusVariable(focusSpeed, send); return; }
+            if (ViscaParser.TryParseFocusDirect(frame, out var focusPos)) { _handler.HandleFocusDirect(focusPos, send); return; }
+            if (ViscaParser.TryParseIrisVariable(frame, out var irisDir)) { _handler.HandleIrisVariable(irisDir, send); return; }
+            if (ViscaParser.TryParseIrisDirect(frame, out var irisPos)) { _handler.HandleIrisDirect(irisPos, send); return; }
+            if (ViscaParser.TryParseMemoryRecall(frame, out var memRecall)) { _handler.HandleMemoryRecall(memRecall, send); return; }
+            if (ViscaParser.TryParseMemorySet(frame, out var memSet)) { _handler.HandleMemorySet(memSet, send); return; }
+
             // Known but unsupported commands: log what came in, do not apply to camera.
             var name = ViscaParser.GetCommandName(frame);
             Log($"Ignored VISCA command: {name} frame={BitConverter.ToString(frame)}");

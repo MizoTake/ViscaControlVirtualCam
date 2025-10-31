@@ -35,7 +35,7 @@ public class PtzModelTests
     public void Absolute_Move_ReachesTarget()
     {
         var m = new PtzModel { PanMinDeg = -170, PanMaxDeg = 170, TiltMinDeg = -30, TiltMaxDeg = 90, MoveDamping = 100f };
-        m.CommandPanTiltAbsolute(0x10, 0x10, 0x8000, 0x8000); // center
+        m.CommandPanTiltAbsolute(0x10, 0x10, 0x8000, 0x8000); // center: pan=0, tilt=30
         var yaw = -45f; var pitch = -10f; var fov = 60f;
         for (int i = 0; i < 20; i++)
         {
@@ -43,7 +43,8 @@ public class PtzModelTests
             yaw += s.DeltaYawDeg;
             pitch += s.DeltaPitchDeg;
         }
-        Assert.That(yaw, Is.InRange(-1.0f, 1.0f));
-        Assert.That(pitch, Is.InRange(-1.0f, 1.0f));
+        // Target: pan=0deg (center of -170 to 170), tilt=30deg (center of -30 to 90)
+        Assert.That(yaw, Is.InRange(-1.0f, 1.0f), "Pan should reach 0 degrees");
+        Assert.That(pitch, Is.InRange(29.0f, 31.0f), "Tilt should reach 30 degrees");
     }
 }

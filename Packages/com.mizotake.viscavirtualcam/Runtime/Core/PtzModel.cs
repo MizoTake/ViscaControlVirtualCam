@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ViscaControlVirtualCam
 {
@@ -8,6 +9,15 @@ namespace ViscaControlVirtualCam
         public float DeltaPitchDeg; // +up
         public float NewFovDeg;     // absolute value
         public bool HasNewFov;
+    }
+
+    public struct PtzMemoryPreset
+    {
+        public float PanDeg;
+        public float TiltDeg;
+        public float FovDeg;
+        public float FocusPos;
+        public float IrisPos;
     }
 
     // Pure C# PTZ core: holds state and computes step deltas from commands.
@@ -30,12 +40,35 @@ namespace ViscaControlVirtualCam
         public byte PanVmin = 0x01, PanVmax = 0x18;
         public byte TiltVmin = 0x01, TiltVmax = 0x14;
 
+        // Blackmagic PTZ Control: Focus/Iris support
+        public float FocusMaxSpeed = 100f; // units/sec
+        public float IrisMaxSpeed = 50f;   // units/sec
+        public float FocusMin = 0f;
+        public float FocusMax = 65535f;
+        public float IrisMin = 0f;
+        public float IrisMax = 65535f;
+
         private float _omegaPan;  // +right, deg/s
         private float _omegaTilt; // +up, deg/s
         private float _omegaFov;  // +increase FOV, deg/s
+        private float _omegaFocus; // +far, units/s
+        private float _omegaIris;  // +open, units/s
 
         private float? _targetPanDeg;  // absolute target yaw
         private float? _targetTiltDeg; // absolute target pitch
+        private float? _targetFov;     // absolute target FOV
+        private float? _targetFocus;   // absolute target focus
+        private float? _targetIris;    // absolute target iris
+
+        // Memory presets (Blackmagic PTZ Control)
+        private readonly Dictionary<byte, PtzMemoryPreset> _memoryPresets = new Dictionary<byte, PtzMemoryPreset>();
+
+        // Current state for memory operations
+        public float CurrentPanDeg { get; private set; }
+        public float CurrentTiltDeg { get; private set; }
+        public float CurrentFovDeg { get; private set; }
+        public float CurrentFocus { get; private set; }
+        public float CurrentIris { get; private set; }
 
         public void CommandPanTiltVariable(byte vv, byte ww, AxisDirection panDir, AxisDirection tiltDir)
         {
@@ -78,8 +111,93 @@ namespace ViscaControlVirtualCam
             _omegaTilt = 0f;
         }
 
+        // Blackmagic PTZ Control: Zoom Direct
+        public void CommandZoomDirect(ushort zoomPos)
+        {
+            float fov = Lerp(MinFov, MaxFov, zoomPos / 65535f);
+            _targetFov = fov;
+            _omegaFov = 0f;
+        }
+
+        // Blackmagic PTZ Control: Focus Variable
+        public void CommandFocusVariable(byte focusSpeed)
+        {
+            if (focusSpeed == 0x00)
+            {
+                _omegaFocus = 0f;
+                return;
+            }
+            // 0x02 = Far, 0x03 = Near
+            float sign = focusSpeed == 0x02 ? 1f : -1f;
+            _omegaFocus = FocusMaxSpeed * sign;
+        }
+
+        // Blackmagic PTZ Control: Focus Direct
+        public void CommandFocusDirect(ushort focusPos)
+        {
+            _targetFocus = focusPos;
+            _omegaFocus = 0f;
+        }
+
+        // Blackmagic PTZ Control: Iris Variable
+        public void CommandIrisVariable(byte irisDir)
+        {
+            if (irisDir == 0x00)
+            {
+                _omegaIris = 0f;
+                return;
+            }
+            // 0x02 = Open, 0x03 = Close
+            float sign = irisDir == 0x02 ? 1f : -1f;
+            _omegaIris = IrisMaxSpeed * sign;
+        }
+
+        // Blackmagic PTZ Control: Iris Direct
+        public void CommandIrisDirect(ushort irisPos)
+        {
+            _targetIris = irisPos;
+            _omegaIris = 0f;
+        }
+
+        // Blackmagic PTZ Control: Memory Recall
+        public void CommandMemoryRecall(byte memoryNumber)
+        {
+            if (_memoryPresets.TryGetValue(memoryNumber, out var preset))
+            {
+                _targetPanDeg = preset.PanDeg;
+                _targetTiltDeg = preset.TiltDeg;
+                _targetFov = preset.FovDeg;
+                _targetFocus = preset.FocusPos;
+                _targetIris = preset.IrisPos;
+                _omegaPan = 0f;
+                _omegaTilt = 0f;
+                _omegaFov = 0f;
+                _omegaFocus = 0f;
+                _omegaIris = 0f;
+            }
+        }
+
+        // Blackmagic PTZ Control: Memory Set
+        public void CommandMemorySet(byte memoryNumber)
+        {
+            var preset = new PtzMemoryPreset
+            {
+                PanDeg = CurrentPanDeg,
+                TiltDeg = CurrentTiltDeg,
+                FovDeg = CurrentFovDeg,
+                FocusPos = CurrentFocus,
+                IrisPos = CurrentIris
+            };
+            _memoryPresets[memoryNumber] = preset;
+        }
+
         public PtzStepResult Step(float currentYawDeg, float currentPitchDeg, float currentFovDeg, float dt)
         {
+            // Update current state for memory operations
+            CurrentPanDeg = currentYawDeg;
+            CurrentTiltDeg = currentPitchDeg;
+            CurrentFovDeg = currentFovDeg;
+
             var result = new PtzStepResult();
 
             // Velocity drive
@@ -106,12 +224,39 @@ namespace ViscaControlVirtualCam
             }
 
             // Zoom
-            float newFov = Clamp(currentFovDeg + _omegaFov * dt, MinFov, MaxFov);
+            float newFov = currentFovDeg + _omegaFov * dt;
+            if (_targetFov.HasValue)
+            {
+                float targetFov = Clamp(_targetFov.Value, MinFov, MaxFov);
+                newFov = Damp(currentFovDeg, targetFov, MoveDamping, dt);
+                if (Math.Abs(newFov - targetFov) < 0.1f) _targetFov = null;
+            }
+            newFov = Clamp(newFov, MinFov, MaxFov);
             if (Math.Abs(newFov - currentFovDeg) > 1e-4f)
             {
                 result.NewFovDeg = newFov;
                 result.HasNewFov = true;
             }
+
+            // Focus (Blackmagic PTZ Control)
+            CurrentFocus += _omegaFocus * dt;
+            if (_targetFocus.HasValue)
+            {
+                float targetFocus = Clamp(_targetFocus.Value, FocusMin, FocusMax);
+                CurrentFocus = Damp(CurrentFocus, targetFocus, MoveDamping, dt);
+                if (Math.Abs(CurrentFocus - targetFocus) < 1f) _targetFocus = null;
+            }
+            CurrentFocus = Clamp(CurrentFocus, FocusMin, FocusMax);
+
+            // Iris (Blackmagic PTZ Control)
+            CurrentIris += _omegaIris * dt;
+            if (_targetIris.HasValue)
+            {
+                float targetIris = Clamp(_targetIris.Value, IrisMin, IrisMax);
+                CurrentIris = Damp(CurrentIris, targetIris, MoveDamping, dt);
+                if (Math.Abs(CurrentIris - targetIris) < 1f) _targetIris = null;
+            }
+            CurrentIris = Clamp(CurrentIris, IrisMin, IrisMax);
 
             return result;
         }

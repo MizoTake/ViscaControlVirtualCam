@@ -69,6 +69,90 @@ namespace ViscaControlVirtualCam
             return true;
         }
 
+        // Blackmagic PTZ Control: Zoom Direct
+        public bool HandleZoomDirect(ushort zoomPos, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandZoomDirect(zoomPos);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Blackmagic PTZ Control: Focus Variable
+        public bool HandleFocusVariable(byte focusSpeed, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandFocusVariable(focusSpeed);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Blackmagic PTZ Control: Focus Direct
+        public bool HandleFocusDirect(ushort focusPos, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandFocusDirect(focusPos);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Blackmagic PTZ Control: Iris Variable
+        public bool HandleIrisVariable(byte irisDir, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandIrisVariable(irisDir);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Blackmagic PTZ Control: Iris Direct
+        public bool HandleIrisDirect(ushort irisPos, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandIrisDirect(irisPos);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Blackmagic PTZ Control: Memory Recall
+        public bool HandleMemoryRecall(byte memoryNumber, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandMemoryRecall(memoryNumber);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Blackmagic PTZ Control: Memory Set
+        public bool HandleMemorySet(byte memoryNumber, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandMemorySet(memoryNumber);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
         public void HandleSyntaxError(byte[] frame, Action<byte[]> responder)
         {
             SendError(responder, 0x02, _replyMode);
