@@ -153,6 +153,18 @@ namespace ViscaControlVirtualCam
             return true;
         }
 
+        // Standard VISCA: Pan/Tilt Home
+        public bool HandleHome(Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandHome();
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
         public void HandleSyntaxError(byte[] frame, Action<byte[]> responder)
         {
             SendError(responder, 0x02, _replyMode);

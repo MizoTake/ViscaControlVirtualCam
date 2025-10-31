@@ -20,6 +20,7 @@ namespace ViscaControlVirtualCam
             // Standard VISCA commands
             Register(new PanTiltDriveCommand());
             Register(new PanTiltAbsoluteCommand());
+            Register(new PanTiltHomeCommand());
             Register(new ZoomVariableCommand());
 
             // Blackmagic PTZ Control extended commands

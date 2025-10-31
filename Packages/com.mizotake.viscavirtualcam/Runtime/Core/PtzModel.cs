@@ -60,6 +60,14 @@ namespace ViscaControlVirtualCam
         private float? _targetFov;     // absolute target FOV
         private float? _targetFocus;   // absolute target focus
         private float? _targetIris;    // absolute target iris
+        
+        // Home (initial) baseline
+        private bool _hasHome;
+        private float _homePanDeg;
+        private float _homeTiltDeg;
+        private float _homeFovDeg;
+        private float _homeFocus;
+        private float _homeIris;
 
         // Memory presets (Blackmagic PTZ Control)
         private readonly Dictionary<byte, PtzMemoryPreset> _memoryPresets = new Dictionary<byte, PtzMemoryPreset>();
@@ -131,6 +139,48 @@ namespace ViscaControlVirtualCam
             _targetTiltDeg = tiltDeg;
             _omegaPan = 0f;
             _omegaTilt = 0f;
+        }
+
+        /// <summary>
+        /// Set home baseline (initial values) used by Home command
+        /// </summary>
+        public void SetHomeBaseline(float panDeg, float tiltDeg, float fovDeg, float focus, float iris)
+        {
+            _homePanDeg = panDeg;
+            _homeTiltDeg = tiltDeg;
+            _homeFovDeg = fovDeg;
+            _homeFocus = focus;
+            _homeIris = iris;
+            _hasHome = true;
+        }
+
+        /// <summary>
+        /// Reset targets to home baseline (Pan/Tilt/FOV/Focus/Iris)
+        /// </summary>
+        public void CommandHome()
+        {
+            if (!_hasHome)
+            {
+                // If home not set, default to zeros and current/mid values
+                _homePanDeg = 0f;
+                _homeTiltDeg = 0f;
+                _homeFovDeg = Clamp(CurrentFovDeg == 0 ? 60f : CurrentFovDeg, MinFov, MaxFov);
+                _homeFocus = CurrentFocus;
+                _homeIris = CurrentIris;
+                _hasHome = true;
+            }
+
+            _targetPanDeg = _homePanDeg;
+            _targetTiltDeg = _homeTiltDeg;
+            _targetFov = _homeFovDeg;
+            _targetFocus = _homeFocus;
+            _targetIris = _homeIris;
+
+            _omegaPan = 0f;
+            _omegaTilt = 0f;
+            _omegaFov = 0f;
+            _omegaFocus = 0f;
+            _omegaIris = 0f;
         }
 
         // Blackmagic PTZ Control: Zoom Direct

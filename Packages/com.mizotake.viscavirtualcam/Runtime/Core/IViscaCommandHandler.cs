@@ -26,6 +26,9 @@ namespace ViscaControlVirtualCam
 
         bool HandleMemorySet(byte memoryNumber, Action<byte[]> responder);
 
+        // Standard VISCA: Pan/Tilt Home (also used to reset to initial values)
+        bool HandleHome(Action<byte[]> responder);
+
         // For error reporting path
         void HandleSyntaxError(byte[] frame, Action<byte[]> responder);
     }

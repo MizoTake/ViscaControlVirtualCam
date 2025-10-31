@@ -33,6 +33,12 @@ namespace ViscaControlVirtualCam
 
             _model = new PtzModel(_playerPrefs, prefsKeyPrefix);
             ApplySettings();
+
+            // Capture initial transform/camera as home baseline
+            float yaw = NormalizeAngle(panPivot.localEulerAngles.y);
+            float pitch = -NormalizeAngle(tiltPivot.localEulerAngles.x);
+            float fov = targetCamera != null ? targetCamera.fieldOfView : 60f;
+            _model.SetHomeBaseline(yaw, pitch, fov, _model.CurrentFocus, _model.CurrentIris);
         }
 
 #if UNITY_EDITOR
@@ -43,6 +49,12 @@ namespace ViscaControlVirtualCam
                 // In editor, create model without PlayerPrefs
                 if (_model == null) _model = new PtzModel(null, prefsKeyPrefix);
                 ApplySettings();
+
+                // Keep home baseline in sync in Editor
+                float yaw = NormalizeAngle(panPivot != null ? panPivot.localEulerAngles.y : 0f);
+                float pitch = -NormalizeAngle(tiltPivot != null ? tiltPivot.localEulerAngles.x : 0f);
+                float fov = targetCamera != null ? targetCamera.fieldOfView : 60f;
+                _model.SetHomeBaseline(yaw, pitch, fov, _model.CurrentFocus, _model.CurrentIris);
             }
         }
 #endif
