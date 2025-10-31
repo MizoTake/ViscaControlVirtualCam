@@ -86,16 +86,35 @@ namespace ViscaControlVirtualCam
             // Determine message type from content
             ViscaLogLevel messageLevel = ViscaLogLevel.Info;
 
+            bool ContainsCI(string s, string needle) => s?.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
+
             if (message.StartsWith("RX:"))
+            {
                 messageLevel = ViscaLogLevel.Commands;
-            else if (message.Contains("ERROR") || message.Contains("error"))
+            }
+            // Explicitly classify known error patterns emitted by ViscaServerCore
+            else if (
+                ContainsCI(message, "invalid visca frame") ||
+                ContainsCI(message, "no terminator") ||
+                ContainsCI(message, "frame too large") ||
+                ContainsCI(message, "receive error") ||
+                ContainsCI(message, " error:") || // generic error phrasing
+                ContainsCI(message, "exception"))
+            {
                 messageLevel = ViscaLogLevel.Errors;
-            else if (message.Contains("WARNING") || message.Contains("warning"))
+            }
+            else if (ContainsCI(message, "warning"))
+            {
                 messageLevel = ViscaLogLevel.Warnings;
-            else if (message.Contains("started") || message.Contains("stopped"))
+            }
+            else if (ContainsCI(message, "started") || ContainsCI(message, "stopped"))
+            {
                 messageLevel = ViscaLogLevel.Info;
+            }
             else
+            {
                 messageLevel = ViscaLogLevel.Debug;
+            }
 
             // Filter based on log level
             if ((int)messageLevel > (int)logLevel) return;
