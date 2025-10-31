@@ -11,7 +11,15 @@ namespace ViscaControlVirtualCam
 
         [Header("Settings Preset")] public PtzSettings settings;
 
+        [Header("Memory Presets")]
+        [Tooltip("Enable persistent memory presets using PlayerPrefs")]
+        public bool enablePersistentMemory = true;
+
+        [Tooltip("Prefix for PlayerPrefs keys (default: ViscaPtz_)")]
+        public string prefsKeyPrefix = "ViscaPtz_";
+
         private PtzModel _model;
+        private IPlayerPrefsAdapter _playerPrefs;
         public PtzModel Model => _model;
 
         private void Awake()
@@ -20,7 +28,10 @@ namespace ViscaControlVirtualCam
             if (tiltPivot == null) tiltPivot = transform;
             if (targetCamera == null) targetCamera = GetComponentInChildren<Camera>();
 
-            _model = new PtzModel();
+            // Create PlayerPrefs adapter if persistent memory is enabled
+            _playerPrefs = enablePersistentMemory ? new UnityPlayerPrefsAdapter() : null;
+
+            _model = new PtzModel(_playerPrefs, prefsKeyPrefix);
             ApplySettings();
         }
 
@@ -29,7 +40,8 @@ namespace ViscaControlVirtualCam
         {
             if (!Application.isPlaying)
             {
-                if (_model == null) _model = new PtzModel();
+                // In editor, create model without PlayerPrefs
+                if (_model == null) _model = new PtzModel(null, prefsKeyPrefix);
                 ApplySettings();
             }
         }

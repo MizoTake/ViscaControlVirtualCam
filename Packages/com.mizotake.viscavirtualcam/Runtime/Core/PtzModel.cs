@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ViscaControlVirtualCam
 {
@@ -63,12 +64,33 @@ namespace ViscaControlVirtualCam
         // Memory presets (Blackmagic PTZ Control)
         private readonly Dictionary<byte, PtzMemoryPreset> _memoryPresets = new Dictionary<byte, PtzMemoryPreset>();
 
+        // PlayerPrefs adapter for persistence
+        private readonly IPlayerPrefsAdapter _playerPrefs;
+        private readonly string _prefsKeyPrefix;
+
         // Current state for memory operations
         public float CurrentPanDeg { get; private set; }
         public float CurrentTiltDeg { get; private set; }
         public float CurrentFovDeg { get; private set; }
         public float CurrentFocus { get; private set; }
         public float CurrentIris { get; private set; }
+
+        /// <summary>
+        /// Constructor with optional PlayerPrefs adapter for persistence
+        /// </summary>
+        /// <param name="playerPrefs">PlayerPrefs adapter (null = no persistence)</param>
+        /// <param name="prefsKeyPrefix">Prefix for PlayerPrefs keys (default: "ViscaPtz_")</param>
+        public PtzModel(IPlayerPrefsAdapter playerPrefs = null, string prefsKeyPrefix = "ViscaPtz_")
+        {
+            _playerPrefs = playerPrefs;
+            _prefsKeyPrefix = prefsKeyPrefix;
+
+            // Load presets from PlayerPrefs if available
+            if (_playerPrefs != null)
+            {
+                LoadAllPresets();
+            }
+        }
 
         public void CommandPanTiltVariable(byte vv, byte ww, AxisDirection panDir, AxisDirection tiltDir)
         {
@@ -189,6 +211,90 @@ namespace ViscaControlVirtualCam
                 IrisPos = CurrentIris
             };
             _memoryPresets[memoryNumber] = preset;
+
+            // Save to PlayerPrefs if available
+            SavePreset(memoryNumber, preset);
+        }
+
+        /// <summary>
+        /// Save a preset to PlayerPrefs
+        /// </summary>
+        private void SavePreset(byte memoryNumber, PtzMemoryPreset preset)
+        {
+            if (_playerPrefs == null) return;
+
+            string key = $"{_prefsKeyPrefix}Mem{memoryNumber}_";
+            _playerPrefs.SetFloat(key + "Pan", preset.PanDeg);
+            _playerPrefs.SetFloat(key + "Tilt", preset.TiltDeg);
+            _playerPrefs.SetFloat(key + "Fov", preset.FovDeg);
+            _playerPrefs.SetFloat(key + "Focus", preset.FocusPos);
+            _playerPrefs.SetFloat(key + "Iris", preset.IrisPos);
+            _playerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Load a preset from PlayerPrefs
+        /// </summary>
+        private bool LoadPreset(byte memoryNumber, out PtzMemoryPreset preset)
+        {
+            preset = default;
+            if (_playerPrefs == null) return false;
+
+            string key = $"{_prefsKeyPrefix}Mem{memoryNumber}_";
+            if (!_playerPrefs.HasKey(key + "Pan")) return false;
+
+            preset = new PtzMemoryPreset
+            {
+                PanDeg = _playerPrefs.GetFloat(key + "Pan", 0f),
+                TiltDeg = _playerPrefs.GetFloat(key + "Tilt", 0f),
+                FovDeg = _playerPrefs.GetFloat(key + "Fov", 60f),
+                FocusPos = _playerPrefs.GetFloat(key + "Focus", 0f),
+                IrisPos = _playerPrefs.GetFloat(key + "Iris", 0f)
+            };
+            return true;
+        }
+
+        /// <summary>
+        /// Load all presets from PlayerPrefs
+        /// </summary>
+        private void LoadAllPresets()
+        {
+            if (_playerPrefs == null) return;
+
+            // Load presets 0-9 (common range for PTZ cameras)
+            for (byte i = 0; i < 10; i++)
+            {
+                if (LoadPreset(i, out var preset))
+                {
+                    _memoryPresets[i] = preset;
+                }
+            }
+        }
+
+        /// <summary>
+        /// Delete a preset from memory and PlayerPrefs
+        /// </summary>
+        public void DeletePreset(byte memoryNumber)
+        {
+            _memoryPresets.Remove(memoryNumber);
+
+            if (_playerPrefs == null) return;
+
+            string key = $"{_prefsKeyPrefix}Mem{memoryNumber}_";
+            _playerPrefs.DeleteKey(key + "Pan");
+            _playerPrefs.DeleteKey(key + "Tilt");
+            _playerPrefs.DeleteKey(key + "Fov");
+            _playerPrefs.DeleteKey(key + "Focus");
+            _playerPrefs.DeleteKey(key + "Iris");
+            _playerPrefs.Save();
+        }
+
+        /// <summary>
+        /// Get all saved preset numbers
+        /// </summary>
+        public IEnumerable<byte> GetSavedPresets()
+        {
+            return _memoryPresets.Keys;
         }
 
         public PtzStepResult Step(float currentYawDeg, float currentPitchDeg, float currentFovDeg, float dt)
