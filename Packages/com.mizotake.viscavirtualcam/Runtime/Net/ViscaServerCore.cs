@@ -85,15 +85,40 @@ namespace ViscaControlVirtualCam
 
         private void UdpReceiveCallback(IAsyncResult ar)
         {
+            // Snapshot to avoid race with Stop()
+            var udp = _udp;
+            if (udp == null) return;
+
             IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
             byte[] data;
-            try { data = _udp.EndReceive(ar, ref remote); }
-            catch (ObjectDisposedException) { return; }
-            catch (Exception e) { Log($"UDP receive error: {e.Message}"); if (_udp != null) _udp.BeginReceive(UdpReceiveCallback, null); return; }
+            try
+            {
+                data = udp.EndReceive(ar, ref remote);
+            }
+            catch (ObjectDisposedException)
+            {
+                // Socket was disposed while awaiting receive; exit quietly
+                return;
+            }
+            catch (Exception e)
+            {
+                // Only log if still active to avoid noise during shutdown
+                if (_udp != null) Log($"UDP receive error: {e.Message}");
+                try { _udp?.BeginReceive(UdpReceiveCallback, null); } catch { }
+                return;
+            }
 
-            if (_udp != null) _udp.BeginReceive(UdpReceiveCallback, null);
+            try { _udp?.BeginReceive(UdpReceiveCallback, null); } catch { }
 
-            Action<byte[]> send = (bytes) => { try { _udp?.Send(bytes, bytes.Length, remote); } catch { } };
+            Action<byte[]> send = (bytes) =>
+            {
+                try
+                {
+                    var u = _udp;
+                    if (u != null) u.Send(bytes, bytes.Length, remote);
+                }
+                catch { }
+            };
             ProcessFrame(data, send);
         }
 
@@ -102,9 +127,11 @@ namespace ViscaControlVirtualCam
             var token = _cts;
             while (token != null && !token.IsCancellationRequested)
             {
+                var listener = _tcp;
+                if (listener == null) break;
                 try
                 {
-                    var client = _tcp.AcceptTcpClient();
+                    var client = listener.AcceptTcpClient();
                     if (System.Threading.Interlocked.Increment(ref _clientCount) > _opt.MaxClients)
                     {
                         Log("TCP client refused: max clients reached");
@@ -118,9 +145,13 @@ namespace ViscaControlVirtualCam
                 }
                 catch (SocketException)
                 {
-                    if (_tcp == null) break;
+                    if (_tcp == null) break; // shutting down
                 }
                 catch (ObjectDisposedException) { break; }
+                catch (Exception e)
+                {
+                    if (_tcp != null) Log($"TCP accept error: {e.Message}");
+                }
             }
         }
 
