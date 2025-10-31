@@ -33,4 +33,14 @@ namespace ViscaControlVirtualCam
         Zoom = 4,
         All = Pan | Tilt | Zoom
     }
+
+    public enum ViscaLogLevel
+    {
+        None = 0,        // No logging
+        Errors = 1,      // Log only errors
+        Warnings = 2,    // Log errors and warnings
+        Info = 3,        // Log errors, warnings, and info (connection events)
+        Commands = 4,    // Log all received commands (verbose)
+        Debug = 5        // Log everything including debug info
+    }
 }

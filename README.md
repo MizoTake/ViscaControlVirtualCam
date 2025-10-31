@@ -1,66 +1,54 @@
-# ViscaControlVirtualCam
+﻿# VISCA Control Virtual Camera
 
-Unity 上で VISCA 互換コマンドにより仮想 PTZ カメラを制御する最小実装です。Pan/Tilt は Transform 回転、Zoom は Camera の FOV で表現します。サンプルシーン生成と、ACK/Completion を返す UDP/TCP Raw VISCA サーバーを含みます。
+Unity上でVISCAプロトコルによるPTZカメラ制御をシミュレートするパッケージです。
 
-本リポジトリは UPM（Unity Package Manager）対応の埋め込みパッケージを同梱しています。
-パッケージ名: `com.mizotake.viscavirtualcam`（`Packages/com.mizotake.viscavirtualcam`）。
+## サンプルシーン
 
-## 要件
-- Unity 2022.3 LTS（検証: `2022.3.62f2`）
-- クライアントから UDP 52381 / TCP 52380 へ到達可能
+`Assets/ViscaControlVirtualCamera/Scenes/PTZ_Sample.unity` を開いて実行してください。
 
-## 特長
-- UDP Raw VISCA（1 パケット = 1 フレーム、終端 `0xFF`）
-- TCP Raw VISCA（ストリームを `0xFF` 区切りでフレーミング）
-- PT 連続駆動、Zoom 可変速度、PT 絶対位置
-- 速度カーブ（γ）、角度/FOV 制限、簡易 ACK/Completion/Error 応答
+## 機能
 
-## クイックスタート
-- Unity を開き、メニュー `Tools > Visca > Create PTZ Sample Scene` でサンプル作成
-- 再生（Play）開始。既定で UDP `52381` / TCP `52380` を待受
-- VISCA フレーム（16 進）例:
-  - PT Drive: `81 01 06 01 VV WW PP TT FF`
-  - Zoom Var: `81 01 04 07 ZZ FF`（`ZZ=2p:Tele, 3p:Wide, p=0..7, 00=Stop`）
-  - PT Absolute: `81 01 06 02 VV WW p1 p2 p3 p4 t1 t2 t3 t4 FF`
+### VISCAサーバー
 
-- コントローラーには [ViscaCamLink](https://github.com/misorrek/ViscaCamLink)を使用
+Blackmagic ATEM等のスイッチャーからのVISCA制御を受信し、Unity上のVirtual Cameraを制御します。
 
-## コンポーネント
-- `PtzControllerBehaviour`（呼び出し側 MonoBehaviour）
-  - `panPivot`/`tiltPivot`、`targetCamera` を指定
-  - 内部で純 C# の `PtzModel` を保持し、`Update` で Transform/FOV に反映
-- `ViscaServerBehaviour`（呼び出し側 MonoBehaviour）
-  - `transport`（`UdpRawVisca`/`TcpRawVisca`/`Both`）、`udpPort`、`tcpPort`、`replyMode`、`maxClients` を設定
-  - 内部で純 C# の `ViscaServerCore` を起動し、`PtzViscaHandler` を介して PTZ を適用
+#### 対応コマンド
+- **標準VISCA**: Pan/Tilt Drive, Pan/Tilt Absolute, Zoom Variable
+- **Blackmagic拡張**: Zoom Direct, Focus Variable/Direct, Iris Variable/Direct, Memory Recall/Set
 
-## Pure C# コア
-- `PtzModel` — PTZ 状態・コマンド・ステップ更新（MonoBehaviour 非依存）
-- `ViscaServerCore` — UDP/TCP 受信・フレーミング・パース（MonoBehaviour 非依存）
-- `PtzViscaHandler` — VISCA コマンドを `PtzModel` に橋渡し
+### ログ機能
 
-## UPM インストール方法
-- 埋め込み（同梱）: 本プロジェクトでは `Packages/com.mizotake.viscavirtualcam` が既に含まれています。
-- 外部プロジェクトへ導入:
-  - Unity メニューの「Window > Package Manager」→「+」→「Add package from disk...」で、本リポジトリ内の `Packages/com.mizotake.viscavirtualcam/package.json` を指定。
-  - または Git URL を指定して追加（Git リモート公開時）。
-    - 例（ブランチ指定）: `https://github.com/MizoTake/ViscaControlVirtualCam.git?path=Packages/com.mizotake.viscavirtualcam#main`
-    - 例（タグ指定）: `https://github.com/MizoTake/ViscaControlVirtualCam.git?path=Packages/com.mizotake.viscavirtualcam#0.1.0`
+受信したVISCAコマンドの詳細をUnityコンソールに出力できます。
 
-## ビルド
-- Editor: File → Build Settings → Build
-- CLI: 必要なら `BuildScript.BuildStandalone` を用意
+#### ViscaServerBehaviour インスペクタ設定
 
-## トラブルシューティング
-- 応答なし: ファイアウォール、`0xFF` 終端、1 パケット 1 コマンドを確認
-- 軸定義: Pan=yaw（右+）、Tilt=pitch（上+）。Tele=FOV 減少、Wide=増加
+**Logging** セクション:
+- **Verbose Log**: 一般ログを有効化
+- **Log Received Commands**: 受信コマンドの詳細ログを有効化
+- **Log Level**: ログフィルタリングレベル（None/Errors/Warnings/Info/Commands/Debug）
 
-## 仕様参照
-- パッケージ内 `Packages/com.mizotake.viscavirtualcam/Documentation~` を参照（VISCA/PTZ 詳細）
+実行中にログレベルを動的に変更できます。
 
-## 外部リンク（Git 公開時）
-- Repository: https://github.com/MizoTake/ViscaControlVirtualCam
-- Documentation: https://github.com/MizoTake/ViscaControlVirtualCam/tree/main/Packages/com.mizotake.viscavirtualcam/Documentation~
-- Changelog: https://github.com/MizoTake/ViscaControlVirtualCam/blob/main/Packages/com.mizotake.viscavirtualcam/CHANGELOG.md
+詳細は `Packages/com.mizotake.viscavirtualcam/Documentation~/CommandLogging.md` を参照してください。
 
+### プリセット（ScriptableObject）
 
+- 作成: Project ビューの `Create > Visca > PTZ Settings` または `Tools > Visca > Create PTZ Presets (Indoor/Outdoor/Fast)`
+- 差し替え: `PtzControllerBehaviour.settings` を入れ替えると挙動が変わります
+- 即時反映: インスペクタの `Apply Settings Now` ボタンで適用（実行中でも可）
 
+## 接続方法
+
+1. サンプルシーンを実行
+2. ViscaServerBehaviour の設定を確認（デフォルト: UDP 52381ポート）
+3. Blackmagic ATEMなどから `<UnityのIPアドレス>:52381` に接続
+4. ATEMからPTZ制御を送信すると、Unity上のカメラが動作します
+
+## ログ出力例
+
+```
+[VISCA] VISCA UDP server started on 52381
+[VISCA] RX: PanTiltDrive: PanSpeed=0x10, TiltSpeed=0x05, PanDir=Right, TiltDir=Up [81-01-06-01-10-05-02-01-FF]
+[VISCA] RX: ZoomDirect: ZoomPos=0xABCD (43981) [81-01-04-47-0A-0B-0C-0D-FF]
+[VISCA] RX: MemoryRecall: MemoryNumber=5 [81-01-04-3F-02-05-FF]
+```

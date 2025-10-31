@@ -12,6 +12,7 @@ namespace ViscaControlVirtualCam
         public int TcpPort = 52380;
         public int MaxClients = 4;
         public bool VerboseLog = true;
+        public bool LogReceivedCommands = true; // Log every received VISCA command with details
         public Action<string> Logger = null; // optional
         public int MaxFrameSize = 4096; // guard for malformed streams
     }
@@ -21,6 +22,7 @@ namespace ViscaControlVirtualCam
     {
         private readonly IViscaCommandHandler _handler;
         private readonly ViscaServerOptions _opt;
+        private readonly ViscaCommandRegistry _commandRegistry;
         private UdpClient _udp;
         private TcpListener _tcp;
         private CancellationTokenSource _cts;
@@ -31,7 +33,13 @@ namespace ViscaControlVirtualCam
         {
             _handler = handler;
             _opt = options ?? new ViscaServerOptions();
+            _commandRegistry = new ViscaCommandRegistry();
         }
+
+        /// <summary>
+        /// Access to the command registry for custom command registration
+        /// </summary>
+        public ViscaCommandRegistry CommandRegistry => _commandRegistry;
 
         public void Start()
         {
@@ -155,32 +163,34 @@ namespace ViscaControlVirtualCam
             if (frame == null || frame.Length == 0) return;
             if (frame[^1] != 0xFF)
             {
-                Log("Invalid VISCA frame (no terminator)");
+                Log($"Invalid VISCA frame (no terminator): {BitConverter.ToString(frame)}");
                 _handler.HandleSyntaxError(frame, send);
                 return;
             }
             if (frame.Length > _opt.MaxFrameSize)
             {
-                Log($"Frame too large: {frame.Length}");
+                Log($"Frame too large: {frame.Length} bytes");
                 return;
             }
-            // Standard VISCA commands
-            if (ViscaParser.TryParsePanTiltDrive(frame, out var vv, out var ww, out var pp, out var tt)) { _handler.HandlePanTiltDrive(vv, ww, pp, tt, send); return; }
-            if (ViscaParser.TryParseZoomVariable(frame, out var zz)) { _handler.HandleZoomVariable(zz, send); return; }
-            if (ViscaParser.TryParsePanTiltAbsolute(frame, out var avv, out var aww, out var panPos, out var tiltPos)) { _handler.HandlePanTiltAbsolute(avv, aww, panPos, tiltPos, send); return; }
 
-            // Blackmagic PTZ Control extended commands
-            if (ViscaParser.TryParseZoomDirect(frame, out var zoomPos)) { _handler.HandleZoomDirect(zoomPos, send); return; }
-            if (ViscaParser.TryParseFocusVariable(frame, out var focusSpeed)) { _handler.HandleFocusVariable(focusSpeed, send); return; }
-            if (ViscaParser.TryParseFocusDirect(frame, out var focusPos)) { _handler.HandleFocusDirect(focusPos, send); return; }
-            if (ViscaParser.TryParseIrisVariable(frame, out var irisDir)) { _handler.HandleIrisVariable(irisDir, send); return; }
-            if (ViscaParser.TryParseIrisDirect(frame, out var irisPos)) { _handler.HandleIrisDirect(irisPos, send); return; }
-            if (ViscaParser.TryParseMemoryRecall(frame, out var memRecall)) { _handler.HandleMemoryRecall(memRecall, send); return; }
-            if (ViscaParser.TryParseMemorySet(frame, out var memSet)) { _handler.HandleMemorySet(memSet, send); return; }
+            // Log received command with details
+            if (_opt.LogReceivedCommands)
+            {
+                string details = _commandRegistry.GetCommandDetails(frame);
+                Log($"RX: {details}");
+            }
 
-            // Known but unsupported commands: log what came in, do not apply to camera.
-            var name = ViscaParser.GetCommandName(frame);
-            Log($"Ignored VISCA command: {name} frame={BitConverter.ToString(frame)}");
+            // Try to execute command through registry
+            var command = _commandRegistry.TryExecute(frame, _handler, send);
+            if (command != null)
+            {
+                // Command was handled successfully
+                return;
+            }
+
+            // Unknown command
+            string cmdName = _commandRegistry.GetCommandName(frame);
+            Log($"WARNING: Command not handled: {cmdName}");
             // Intentionally no error; we just log.
         }
 
