@@ -26,11 +26,20 @@ Blackmagic PTZ Controlに対応したVISCA互換PTZバーチャルカメラサ�
 
 ## インストール
 
-### 方法1: 埋め込みパッケージ
-このリポジトリの `Packages/com.mizotake.viscavirtualcam` にあります。
+### 方法1: Git URL（推奨）
+Unity Package Managerから直接インストール:
+1. Unity Package Manager を開く（Window → Package Manager）
+2. "+" ボタンをクリック → "Add package from git URL..."
+3. 以下のURLを入力:
+```
+https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizotake.viscavirtualcam
+```
 
-### 方法2: 外部パッケージ
-Git URLまたはディスクからパッケージを追加:
+### 方法2: 埋め込みパッケージ
+このリポジトリをクローンして使用する場合、パッケージは `Packages/com.mizotake.viscavirtualcam` にあります。
+
+### 方法3: ローカルディスク
+ダウンロードしたパッケージをローカルから追加:
 1. Unity Package Manager → "+" → "Add package from disk..."
 2. パッケージフォルダ内の `package.json` を選択
 
