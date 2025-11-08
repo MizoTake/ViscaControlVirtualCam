@@ -26,8 +26,28 @@ namespace ViscaControlVirtualCam
 
         bool HandleMemorySet(byte memoryNumber, Action<byte[]> responder);
 
+        bool HandleMemoryReset(byte memoryNumber, Action<byte[]> responder);
+
         // Standard VISCA: Pan/Tilt Home (also used to reset to initial values)
         bool HandleHome(Action<byte[]> responder);
+
+        // Pan/Tilt Reset to center position
+        bool HandlePanTiltReset(Action<byte[]> responder);
+
+        // Focus Mode (Auto/Manual)
+        bool HandleFocusMode(byte mode, Action<byte[]> responder);
+
+        // Focus One Push Auto Focus
+        bool HandleFocusOnePush(Action<byte[]> responder);
+
+        // Inquiry Commands
+        bool HandlePanTiltPositionInquiry(Action<byte[]> responder);
+
+        bool HandleZoomPositionInquiry(Action<byte[]> responder);
+
+        bool HandleFocusPositionInquiry(Action<byte[]> responder);
+
+        bool HandleFocusModeInquiry(Action<byte[]> responder);
 
         // For error reporting path
         void HandleSyntaxError(byte[] frame, Action<byte[]> responder);

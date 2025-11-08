@@ -64,7 +64,7 @@ namespace ViscaControlVirtualCam
                 return;
             }
 
-            var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode);
+            var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode, msg => LogMessage(msg));
             var opt = new ViscaServerOptions
             {
                 Transport = transport,

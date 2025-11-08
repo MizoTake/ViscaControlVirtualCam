@@ -21,16 +21,26 @@ namespace ViscaControlVirtualCam
             Register(new PanTiltDriveCommand());
             Register(new PanTiltAbsoluteCommand());
             Register(new PanTiltHomeCommand());
+            Register(new PanTiltResetCommand());
             Register(new ZoomVariableCommand());
 
             // Blackmagic PTZ Control extended commands
             Register(new ZoomDirectCommand());
             Register(new FocusVariableCommand());
             Register(new FocusDirectCommand());
+            Register(new FocusModeCommand());
+            Register(new FocusOnePushCommand());
             Register(new IrisVariableCommand());
             Register(new IrisDirectCommand());
             Register(new MemoryRecallCommand());
             Register(new MemorySetCommand());
+            Register(new MemoryResetCommand());
+
+            // Inquiry commands
+            Register(new PanTiltPositionInquiryCommand());
+            Register(new ZoomPositionInquiryCommand());
+            Register(new FocusPositionInquiryCommand());
+            Register(new FocusModeInquiryCommand());
         }
 
         /// <summary>

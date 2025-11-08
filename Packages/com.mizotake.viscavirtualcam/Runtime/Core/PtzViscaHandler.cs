@@ -8,12 +8,15 @@ namespace ViscaControlVirtualCam
         private readonly PtzModel _model;
         private readonly Action<Action> _mainThreadDispatcher;
         private readonly ViscaReplyMode _replyMode;
+        private readonly Action<string> _logger;
+        private byte _focusMode = 0x03; // Default: Manual
 
-        public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode)
+        public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode, Action<string> logger = null)
         {
             _model = model;
             _mainThreadDispatcher = mainThreadDispatcher ?? (_ => { });
             _replyMode = replyMode;
+            _logger = logger;
         }
 
         private static void SendAck(Action<byte[]> responder, ViscaReplyMode mode)
@@ -162,6 +165,127 @@ namespace ViscaControlVirtualCam
                 _model.CommandHome();
                 SendCompletion(responder, _replyMode);
             });
+            return true;
+        }
+
+        // Memory Reset
+        public bool HandleMemoryReset(byte memoryNumber, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                _model.DeletePreset(memoryNumber);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Pan/Tilt Reset to center
+        public bool HandlePanTiltReset(Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _mainThreadDispatcher(() =>
+            {
+                // Reset to center position (0, 0)
+                _model.CommandPanTiltAbsolute(0, 0, 0x8000, 0x8000);
+                SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        // Focus Mode (Auto/Manual) - Unity Camera doesn't support auto focus, log only
+        public bool HandleFocusMode(byte mode, Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _focusMode = mode;
+            string modeName = mode switch { 0x02 => "Auto", 0x03 => "Manual", _ => $"0x{mode:X2}" };
+            _logger?.Invoke($"[VISCA] Focus Mode: {modeName} (Unity Camera does not support auto focus)");
+            SendCompletion(responder, _replyMode);
+            return true;
+        }
+
+        // Focus One Push AF - Unity Camera doesn't support auto focus, log only
+        public bool HandleFocusOnePush(Action<byte[]> responder)
+        {
+            SendAck(responder, _replyMode);
+            _logger?.Invoke($"[VISCA] Focus One Push AF (Unity Camera does not support auto focus)");
+            SendCompletion(responder, _replyMode);
+            return true;
+        }
+
+        // Inquiry: Pan/Tilt Position
+        public bool HandlePanTiltPositionInquiry(Action<byte[]> responder)
+        {
+            // Convert current position to VISCA format
+            float panDeg = _model.CurrentPanDeg;
+            float tiltDeg = _model.CurrentTiltDeg;
+
+            // Map to 0-65535 range
+            float panNorm = (panDeg - _model.PanMinDeg) / (_model.PanMaxDeg - _model.PanMinDeg);
+            float tiltNorm = (tiltDeg - _model.TiltMinDeg) / (_model.TiltMaxDeg - _model.TiltMinDeg);
+            ushort panPos = (ushort)(panNorm * 65535f);
+            ushort tiltPos = (ushort)(tiltNorm * 65535f);
+
+            // Encode as nibbles: Y0 50 0p 0p 0p 0p 0t 0t 0t 0t FF
+            responder(new byte[]
+            {
+                0x90, 0x50,
+                (byte)((panPos >> 12) & 0x0F),
+                (byte)((panPos >> 8) & 0x0F),
+                (byte)((panPos >> 4) & 0x0F),
+                (byte)(panPos & 0x0F),
+                (byte)((tiltPos >> 12) & 0x0F),
+                (byte)((tiltPos >> 8) & 0x0F),
+                (byte)((tiltPos >> 4) & 0x0F),
+                (byte)(tiltPos & 0x0F),
+                0xFF
+            });
+            return true;
+        }
+
+        // Inquiry: Zoom Position
+        public bool HandleZoomPositionInquiry(Action<byte[]> responder)
+        {
+            // Convert FOV to zoom position (inverse relationship)
+            float fovNorm = (_model.CurrentFovDeg - _model.MinFov) / (_model.MaxFov - _model.MinFov);
+            ushort zoomPos = (ushort)((1.0f - fovNorm) * 65535f); // Inverted: small FOV = high zoom
+
+            // Encode as nibbles: Y0 50 0p 0p 0p 0p FF
+            responder(new byte[]
+            {
+                0x90, 0x50,
+                (byte)((zoomPos >> 12) & 0x0F),
+                (byte)((zoomPos >> 8) & 0x0F),
+                (byte)((zoomPos >> 4) & 0x0F),
+                (byte)(zoomPos & 0x0F),
+                0xFF
+            });
+            return true;
+        }
+
+        // Inquiry: Focus Position
+        public bool HandleFocusPositionInquiry(Action<byte[]> responder)
+        {
+            ushort focusPos = (ushort)_model.CurrentFocus;
+
+            // Encode as nibbles: Y0 50 0p 0p 0p 0p FF
+            responder(new byte[]
+            {
+                0x90, 0x50,
+                (byte)((focusPos >> 12) & 0x0F),
+                (byte)((focusPos >> 8) & 0x0F),
+                (byte)((focusPos >> 4) & 0x0F),
+                (byte)(focusPos & 0x0F),
+                0xFF
+            });
+            return true;
+        }
+
+        // Inquiry: Focus Mode
+        public bool HandleFocusModeInquiry(Action<byte[]> responder)
+        {
+            // Y0 50 02/03 FF (02=Auto, 03=Manual)
+            responder(new byte[] { 0x90, 0x50, _focusMode, 0xFF });
             return true;
         }
 
