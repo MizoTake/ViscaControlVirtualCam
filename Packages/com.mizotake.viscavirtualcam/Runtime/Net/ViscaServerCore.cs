@@ -192,6 +192,18 @@ namespace ViscaControlVirtualCam
         private void ProcessFrame(byte[] frame, Action<byte[]> send)
         {
             if (frame == null || frame.Length == 0) return;
+
+            // Strip VISCA over IP header if present
+            // Format: 01 XX XX XX (MD and SN) followed by 00 00 00 XX (reserved) + actual VISCA command
+            if (frame.Length > 8 && frame[0] == 0x01 && frame[1] == 0x00 && frame[2] == 0x00)
+            {
+                // Likely VISCA over IP format: skip first 8 bytes
+                byte[] viscaFrame = new byte[frame.Length - 8];
+                Array.Copy(frame, 8, viscaFrame, 0, viscaFrame.Length);
+                frame = viscaFrame;
+                Log($"Stripped VISCA over IP header, processing raw VISCA command");
+            }
+
             if (frame[^1] != 0xFF)
             {
                 Log($"Invalid VISCA frame (no terminator): {BitConverter.ToString(frame)}");
