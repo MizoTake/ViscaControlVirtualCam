@@ -2,54 +2,112 @@ using System;
 
 namespace ViscaControlVirtualCam
 {
+    /// <summary>
+    /// Unified VISCA command handler interface.
+    /// Single method handles all command types via ViscaCommandContext.
+    /// </summary>
     public interface IViscaCommandHandler
     {
-        // Returns true if command accepted. Implementations should be thread-safe.
-        bool HandlePanTiltDrive(byte panSpeed, byte tiltSpeed, byte panDir, byte tiltDir, Action<byte[]> responder);
+        /// <summary>
+        /// Handle a VISCA command.
+        /// </summary>
+        /// <param name="context">Command context containing type and parameters</param>
+        /// <returns>True if command was handled successfully</returns>
+        bool Handle(in ViscaCommandContext context);
 
-        bool HandleZoomVariable(byte zz, Action<byte[]> responder);
+        /// <summary>
+        /// Handle syntax/protocol errors.
+        /// </summary>
+        /// <param name="frame">Raw frame that caused the error</param>
+        /// <param name="responder">Response callback</param>
+        /// <param name="errorCode">VISCA error code (see ViscaProtocol.Error*)</param>
+        void HandleError(byte[] frame, Action<byte[]> responder, byte errorCode);
+    }
 
-        bool HandlePanTiltAbsolute(byte panSpeed, byte tiltSpeed, ushort panPos, ushort tiltPos, Action<byte[]> responder);
+    /// <summary>
+    /// Response helpers for VISCA handlers.
+    /// </summary>
+    public static class ViscaResponse
+    {
+        private static readonly byte[] AckResponse = { 0x90, ViscaProtocol.ResponseAck, ViscaProtocol.FrameTerminator };
+        private static readonly byte[] CompletionResponse = { 0x90, ViscaProtocol.ResponseCompletion, ViscaProtocol.FrameTerminator };
 
-        // Blackmagic PTZ Control extended commands
-        bool HandleZoomDirect(ushort zoomPos, Action<byte[]> responder);
+        /// <summary>
+        /// Send ACK response (command received).
+        /// </summary>
+        public static void SendAck(Action<byte[]> responder, ViscaReplyMode mode)
+        {
+            if (mode == ViscaReplyMode.None) return;
+            responder(AckResponse);
+        }
 
-        bool HandleFocusVariable(byte focusSpeed, Action<byte[]> responder);
+        /// <summary>
+        /// Send Completion response (command executed).
+        /// </summary>
+        public static void SendCompletion(Action<byte[]> responder, ViscaReplyMode mode)
+        {
+            if (mode != ViscaReplyMode.AckAndCompletion) return;
+            responder(CompletionResponse);
+        }
 
-        bool HandleFocusDirect(ushort focusPos, Action<byte[]> responder);
+        /// <summary>
+        /// Send Error response.
+        /// </summary>
+        public static void SendError(Action<byte[]> responder, byte errorCode)
+        {
+            responder(new byte[] { 0x90, ViscaProtocol.ResponseError, errorCode, ViscaProtocol.FrameTerminator });
+        }
 
-        bool HandleIrisVariable(byte irisDir, Action<byte[]> responder);
+        /// <summary>
+        /// Send inquiry response with 16-bit value as 4 nibbles.
+        /// Format: 90 50 0n 0n 0n 0n FF
+        /// </summary>
+        public static void SendInquiryResponse16(Action<byte[]> responder, ushort value)
+        {
+            responder(new byte[]
+            {
+                0x90, ViscaProtocol.ResponseCompletion,
+                (byte)((value >> 12) & 0x0F),
+                (byte)((value >> 8) & 0x0F),
+                (byte)((value >> 4) & 0x0F),
+                (byte)(value & 0x0F),
+                ViscaProtocol.FrameTerminator
+            });
+        }
 
-        bool HandleIrisDirect(ushort irisPos, Action<byte[]> responder);
+        /// <summary>
+        /// Send inquiry response with two 16-bit values (Pan/Tilt position).
+        /// Format: 90 50 0p 0p 0p 0p 0t 0t 0t 0t FF
+        /// </summary>
+        public static void SendInquiryResponse32(Action<byte[]> responder, ushort value1, ushort value2)
+        {
+            responder(new byte[]
+            {
+                0x90, ViscaProtocol.ResponseCompletion,
+                (byte)((value1 >> 12) & 0x0F),
+                (byte)((value1 >> 8) & 0x0F),
+                (byte)((value1 >> 4) & 0x0F),
+                (byte)(value1 & 0x0F),
+                (byte)((value2 >> 12) & 0x0F),
+                (byte)((value2 >> 8) & 0x0F),
+                (byte)((value2 >> 4) & 0x0F),
+                (byte)(value2 & 0x0F),
+                ViscaProtocol.FrameTerminator
+            });
+        }
 
-        bool HandleMemoryRecall(byte memoryNumber, Action<byte[]> responder);
-
-        bool HandleMemorySet(byte memoryNumber, Action<byte[]> responder);
-
-        bool HandleMemoryReset(byte memoryNumber, Action<byte[]> responder);
-
-        // Standard VISCA: Pan/Tilt Home (also used to reset to initial values)
-        bool HandleHome(Action<byte[]> responder);
-
-        // Pan/Tilt Reset to center position
-        bool HandlePanTiltReset(Action<byte[]> responder);
-
-        // Focus Mode (Auto/Manual)
-        bool HandleFocusMode(byte mode, Action<byte[]> responder);
-
-        // Focus One Push Auto Focus
-        bool HandleFocusOnePush(Action<byte[]> responder);
-
-        // Inquiry Commands
-        bool HandlePanTiltPositionInquiry(Action<byte[]> responder);
-
-        bool HandleZoomPositionInquiry(Action<byte[]> responder);
-
-        bool HandleFocusPositionInquiry(Action<byte[]> responder);
-
-        bool HandleFocusModeInquiry(Action<byte[]> responder);
-
-        // For error reporting path
-        void HandleSyntaxError(byte[] frame, Action<byte[]> responder);
+        /// <summary>
+        /// Send inquiry response with single byte value.
+        /// Format: 90 50 XX FF
+        /// </summary>
+        public static void SendInquiryResponse8(Action<byte[]> responder, byte value)
+        {
+            responder(new byte[]
+            {
+                0x90, ViscaProtocol.ResponseCompletion,
+                value,
+                ViscaProtocol.FrameTerminator
+            });
+        }
     }
 }

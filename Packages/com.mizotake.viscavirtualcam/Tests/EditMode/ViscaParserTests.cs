@@ -1,5 +1,6 @@
 using NUnit.Framework;
 using ViscaControlVirtualCam;
+using System;
 
 public class ViscaParserTests
 {
@@ -22,13 +23,12 @@ public class ViscaParserTests
     public void Parse_PanTiltDrive_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x06, 0x01, 0x10, 0x05, 0x01, 0x01, 0xFF };
-        var cmd = new PanTiltDriveCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
-        // Extract values from frame directly for testing
-        Assert.AreEqual(0x10, frame[4]);
-        Assert.AreEqual(0x05, frame[5]);
-        Assert.AreEqual(0x01, frame[6]);
-        Assert.AreEqual(0x01, frame[7]);
+        Assert.AreEqual("PanTiltDrive", _registry.GetCommandName(frame));
+        // Verify frame values
+        Assert.AreEqual(0x10, frame[4]); // PanSpeed
+        Assert.AreEqual(0x05, frame[5]); // TiltSpeed
+        Assert.AreEqual(0x01, frame[6]); // PanDir
+        Assert.AreEqual(0x01, frame[7]); // TiltDir
     }
 
     [Test]
@@ -42,11 +42,10 @@ public class ViscaParserTests
     [Test]
     public void Parse_PanTiltAbsolute_Speedless_Works()
     {
-        // 8X 01 06 02 p1 p2 p3 p4 t1 t2 t3 t4 FF (no speed bytes)
+        // 8X 01 06 02 p1 p2 p3 p4 t1 t2 t3 t4 FF (no speed bytes, 13 bytes)
         var frame = new byte[] { 0x81, 0x01, 0x06, 0x02, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0xFF };
-        var cmd = new PanTiltAbsoluteCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
-        // Decode the values using ViscaParser
+        Assert.AreEqual("PanTiltAbsolute", _registry.GetCommandName(frame));
+        // Decode the values using ViscaParser (positions start at index 4 for speedless format)
         ushort pan = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
         ushort tilt = ViscaParser.DecodeNibble16(frame[8], frame[9], frame[10], frame[11]);
         Assert.AreEqual(0x0800, pan);
@@ -58,8 +57,7 @@ public class ViscaParserTests
     public void Parse_ZoomDirect_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x47, 0x0A, 0x0B, 0x0C, 0x0D, 0xFF };
-        var cmd = new ZoomDirectCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
+        Assert.AreEqual("ZoomDirect", _registry.GetCommandName(frame));
         ushort zoomPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
         Assert.AreEqual(0xABCD, zoomPos);
     }
@@ -68,8 +66,7 @@ public class ViscaParserTests
     public void Parse_FocusVariable_Far_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x08, 0x02, 0xFF };
-        var cmd = new FocusVariableCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
+        Assert.AreEqual("FocusVariable", _registry.GetCommandName(frame));
         Assert.AreEqual(0x02, frame[4]); // Far
     }
 
@@ -77,8 +74,7 @@ public class ViscaParserTests
     public void Parse_FocusVariable_Near_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x08, 0x03, 0xFF };
-        var cmd = new FocusVariableCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
+        Assert.AreEqual("FocusVariable", _registry.GetCommandName(frame));
         Assert.AreEqual(0x03, frame[4]); // Near
     }
 
@@ -86,8 +82,7 @@ public class ViscaParserTests
     public void Parse_FocusDirect_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x48, 0x01, 0x02, 0x03, 0x04, 0xFF };
-        var cmd = new FocusDirectCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
+        Assert.AreEqual("FocusDirect", _registry.GetCommandName(frame));
         ushort focusPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
         Assert.AreEqual(0x1234, focusPos);
     }
@@ -96,8 +91,7 @@ public class ViscaParserTests
     public void Parse_IrisVariable_Open_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x0B, 0x02, 0xFF };
-        var cmd = new IrisVariableCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
+        Assert.AreEqual("IrisVariable", _registry.GetCommandName(frame));
         Assert.AreEqual(0x02, frame[4]); // Open
     }
 
@@ -105,8 +99,7 @@ public class ViscaParserTests
     public void Parse_IrisVariable_Close_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x0B, 0x03, 0xFF };
-        var cmd = new IrisVariableCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
+        Assert.AreEqual("IrisVariable", _registry.GetCommandName(frame));
         Assert.AreEqual(0x03, frame[4]); // Close
     }
 
@@ -114,8 +107,7 @@ public class ViscaParserTests
     public void Parse_IrisDirect_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x4B, 0x05, 0x06, 0x07, 0x08, 0xFF };
-        var cmd = new IrisDirectCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
+        Assert.AreEqual("IrisDirect", _registry.GetCommandName(frame));
         ushort irisPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
         Assert.AreEqual(0x5678, irisPos);
     }
@@ -124,18 +116,16 @@ public class ViscaParserTests
     public void Parse_MemoryRecall_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x05, 0xFF };
-        var cmd = new MemoryRecallCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
-        Assert.AreEqual(0x05, frame[5]);
+        Assert.AreEqual("MemoryRecall", _registry.GetCommandName(frame));
+        Assert.AreEqual(0x05, frame[5]); // Memory number
     }
 
     [Test]
     public void Parse_MemorySet_Works()
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x3F, 0x01, 0x03, 0xFF };
-        var cmd = new MemorySetCommand();
-        Assert.IsTrue(cmd.TryParse(frame));
-        Assert.AreEqual(0x03, frame[5]);
+        Assert.AreEqual("MemorySet", _registry.GetCommandName(frame));
+        Assert.AreEqual(0x03, frame[5]); // Memory number
     }
 
     [Test]
@@ -148,5 +138,21 @@ public class ViscaParserTests
         Assert.AreEqual("IrisDirect", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x4B, 0x00, 0x00, 0x00, 0x00, 0xFF }));
         Assert.AreEqual("MemoryRecall", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF }));
         Assert.AreEqual("MemorySet", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x3F, 0x01, 0x00, 0xFF }));
+    }
+
+    [Test]
+    public void DirFromVisca_Works()
+    {
+        Assert.AreEqual(AxisDirection.Stop, ViscaParser.DirFromVisca(0x03));
+        Assert.AreEqual(AxisDirection.Negative, ViscaParser.DirFromVisca(0x01));
+        Assert.AreEqual(AxisDirection.Positive, ViscaParser.DirFromVisca(0x02));
+        Assert.AreEqual(AxisDirection.Stop, ViscaParser.DirFromVisca(0x00)); // Invalid defaults to Stop
+    }
+
+    [Test]
+    public void Registry_CommandCount_IsCorrect()
+    {
+        // Verify registry has expected number of commands
+        Assert.GreaterOrEqual(_registry.Count, 15, "Should have at least 15 registered commands");
     }
 }

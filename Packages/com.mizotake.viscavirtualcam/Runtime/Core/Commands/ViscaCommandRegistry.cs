@@ -4,11 +4,39 @@ using System.Collections.Generic;
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// Registry for all supported VISCA commands
+    /// Delegate for parsing a frame into a command context.
+    /// Returns null if frame doesn't match expected format.
     /// </summary>
-    public class ViscaCommandRegistry
+    public delegate ViscaCommandContext? CommandParser(byte[] frame, Action<byte[]> responder);
+
+    /// <summary>
+    /// Registry for VISCA commands with O(1) lookup.
+    /// Commands are indexed by their distinguishing byte pattern.
+    /// </summary>
+    public sealed class ViscaCommandRegistry
     {
-        private readonly List<IViscaCommand> _commands = new List<IViscaCommand>();
+        /// <summary>
+        /// Registered command entry
+        /// </summary>
+        public readonly struct CommandEntry
+        {
+            public readonly ViscaCommandType Type;
+            public readonly string Name;
+            public readonly CommandParser Parser;
+
+            public CommandEntry(ViscaCommandType type, string name, CommandParser parser)
+            {
+                Type = type;
+                Name = name;
+                Parser = parser;
+            }
+        }
+
+        // Primary lookup: key -> command entry (O(1) for exact matches)
+        private readonly Dictionary<int, CommandEntry> _commandsByKey = new Dictionary<int, CommandEntry>();
+
+        // Secondary lookup for commands that need length/content inspection
+        private readonly List<CommandEntry> _variableLengthCommands = new List<CommandEntry>();
 
         public ViscaCommandRegistry()
         {
@@ -17,102 +45,254 @@ namespace ViscaControlVirtualCam
 
         private void RegisterDefaultCommands()
         {
-            // Standard VISCA commands
-            Register(new PanTiltDriveCommand());
-            Register(new PanTiltAbsoluteCommand());
-            Register(new PanTiltHomeCommand());
-            Register(new PanTiltResetCommand());
-            Register(new ZoomVariableCommand());
-
-            // Blackmagic PTZ Control extended commands
-            Register(new ZoomDirectCommand());
-            Register(new FocusVariableCommand());
-            Register(new FocusDirectCommand());
-            Register(new FocusModeCommand());
-            Register(new FocusOnePushCommand());
-            Register(new IrisVariableCommand());
-            Register(new IrisDirectCommand());
-            Register(new MemoryRecallCommand());
-            Register(new MemorySetCommand());
-            Register(new MemoryResetCommand());
-
-            // Inquiry commands
-            Register(new PanTiltPositionInquiryCommand());
-            Register(new ZoomPositionInquiryCommand());
-            Register(new FocusPositionInquiryCommand());
-            Register(new FocusModeInquiryCommand());
-        }
-
-        /// <summary>
-        /// Register a new VISCA command
-        /// </summary>
-        public void Register(IViscaCommand command)
-        {
-            if (command == null) throw new ArgumentNullException(nameof(command));
-            _commands.Add(command);
-        }
-
-        /// <summary>
-        /// Try to find and execute a command for the given frame
-        /// </summary>
-        /// <param name="frame">Raw VISCA frame</param>
-        /// <param name="handler">Command handler</param>
-        /// <param name="responder">Response callback</param>
-        /// <returns>The command that was executed, or null if no match found</returns>
-        public IViscaCommand TryExecute(byte[] frame, IViscaCommandHandler handler, Action<byte[]> responder)
-        {
-            foreach (var command in _commands)
-            {
-                if (command.TryParse(frame))
+            // Pan/Tilt Drive: 8X 01 06 01 VV WW PP TT FF
+            Register(0x01, 0x06, 0x01, ViscaCommandType.PanTiltDrive, "PanTiltDrive",
+                (frame, responder) =>
                 {
-                    command.Execute(frame, handler, responder);
-                    return command;
+                    if (frame.Length < 9) return null;
+                    return ViscaCommandContext.PanTiltDrive(frame, responder,
+                        frame[4], frame[5], frame[6], frame[7]);
+                });
+
+            // Pan/Tilt Absolute: 8X 01 06 02 VV WW 0p 0p 0p 0p 0t 0t 0t 0t FF
+            Register(0x01, 0x06, 0x02, ViscaCommandType.PanTiltAbsolute, "PanTiltAbsolute",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 15) return null;
+                    int idx = 4;
+                    byte vv = 0, ww = 0;
+                    if (frame.Length >= 17) { vv = frame[idx++]; ww = frame[idx++]; }
+                    ushort pan = ViscaParser.DecodeNibble16(frame[idx], frame[idx + 1], frame[idx + 2], frame[idx + 3]);
+                    ushort tilt = ViscaParser.DecodeNibble16(frame[idx + 4], frame[idx + 5], frame[idx + 6], frame[idx + 7]);
+                    return ViscaCommandContext.PanTiltAbsolute(frame, responder, vv, ww, pan, tilt);
+                });
+
+            // Pan/Tilt Home: 8X 01 06 04 FF
+            Register(0x01, 0x06, 0x04, ViscaCommandType.PanTiltHome, "PanTiltHome",
+                (frame, responder) => ViscaCommandContext.PanTiltHome(frame, responder));
+
+            // Pan/Tilt Reset: 8X 01 06 05 FF
+            Register(0x01, 0x06, 0x05, ViscaCommandType.PanTiltReset, "PanTiltReset",
+                (frame, responder) => ViscaCommandContext.PanTiltReset(frame, responder));
+
+            // Zoom Variable: 8X 01 04 07 ZZ FF
+            Register(0x01, 0x04, 0x07, ViscaCommandType.ZoomVariable, "ZoomVariable",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 6) return null;
+                    return ViscaCommandContext.ZoomVariable(frame, responder, frame[4]);
+                });
+
+            // Zoom Direct: 8X 01 04 47 0p 0p 0p 0p FF
+            Register(0x01, 0x04, 0x47, ViscaCommandType.ZoomDirect, "ZoomDirect",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 9) return null;
+                    ushort pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+                    return ViscaCommandContext.ZoomDirect(frame, responder, pos);
+                });
+
+            // Focus Variable: 8X 01 04 08 ZZ FF
+            Register(0x01, 0x04, 0x08, ViscaCommandType.FocusVariable, "FocusVariable",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 6) return null;
+                    return ViscaCommandContext.FocusVariable(frame, responder, frame[4]);
+                });
+
+            // Focus Direct: 8X 01 04 48 0p 0p 0p 0p FF
+            Register(0x01, 0x04, 0x48, ViscaCommandType.FocusDirect, "FocusDirect",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 9) return null;
+                    ushort pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+                    return ViscaCommandContext.FocusDirect(frame, responder, pos);
+                });
+
+            // Focus Mode: 8X 01 04 38 02/03 FF (Auto/Manual)
+            Register(0x01, 0x04, 0x38, ViscaCommandType.FocusMode, "FocusMode",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 6) return null;
+                    return ViscaCommandContext.FocusModeSet(frame, responder, frame[4]);
+                });
+
+            // Focus One Push: 8X 01 04 18 01 FF
+            Register(0x01, 0x04, 0x18, ViscaCommandType.FocusOnePush, "FocusOnePush",
+                (frame, responder) => ViscaCommandContext.FocusOnePush(frame, responder));
+
+            // Iris Variable: 8X 01 04 0B 00/02/03 FF
+            Register(0x01, 0x04, 0x0B, ViscaCommandType.IrisVariable, "IrisVariable",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 6) return null;
+                    return ViscaCommandContext.IrisVariable(frame, responder, frame[4]);
+                });
+
+            // Iris Direct: 8X 01 04 4B 0p 0p 0p 0p FF
+            Register(0x01, 0x04, 0x4B, ViscaCommandType.IrisDirect, "IrisDirect",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 9) return null;
+                    ushort pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+                    return ViscaCommandContext.IrisDirect(frame, responder, pos);
+                });
+
+            // Memory Recall: 8X 01 04 3F 02 PP FF
+            RegisterVariable(ViscaCommandType.MemoryRecall, "MemoryRecall",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 7) return null;
+                    if (frame[1] != 0x01 || frame[2] != 0x04 || frame[3] != 0x3F || frame[4] != 0x02)
+                        return null;
+                    return ViscaCommandContext.MemoryRecall(frame, responder, frame[5]);
+                });
+
+            // Memory Set: 8X 01 04 3F 01 PP FF
+            RegisterVariable(ViscaCommandType.MemorySet, "MemorySet",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 7) return null;
+                    if (frame[1] != 0x01 || frame[2] != 0x04 || frame[3] != 0x3F || frame[4] != 0x01)
+                        return null;
+                    return ViscaCommandContext.MemorySet(frame, responder, frame[5]);
+                });
+
+            // Memory Reset: 8X 01 04 3F 00 PP FF
+            RegisterVariable(ViscaCommandType.MemoryReset, "MemoryReset",
+                (frame, responder) =>
+                {
+                    if (frame.Length < 7) return null;
+                    if (frame[1] != 0x01 || frame[2] != 0x04 || frame[3] != 0x3F || frame[4] != 0x00)
+                        return null;
+                    return ViscaCommandContext.MemoryReset(frame, responder, frame[5]);
+                });
+
+            // Pan/Tilt Position Inquiry: 8X 09 06 12 FF
+            Register(0x09, 0x06, 0x12, ViscaCommandType.PanTiltPositionInquiry, "PanTiltPositionInquiry",
+                (frame, responder) => ViscaCommandContext.PanTiltPositionInquiry(frame, responder));
+
+            // Zoom Position Inquiry: 8X 09 04 47 FF
+            Register(0x09, 0x04, 0x47, ViscaCommandType.ZoomPositionInquiry, "ZoomPositionInquiry",
+                (frame, responder) => ViscaCommandContext.ZoomPositionInquiry(frame, responder));
+
+            // Focus Position Inquiry: 8X 09 04 48 FF
+            Register(0x09, 0x04, 0x48, ViscaCommandType.FocusPositionInquiry, "FocusPositionInquiry",
+                (frame, responder) => ViscaCommandContext.FocusPositionInquiry(frame, responder));
+
+            // Focus Mode Inquiry: 8X 09 04 38 FF
+            Register(0x09, 0x04, 0x38, ViscaCommandType.FocusModeInquiry, "FocusModeInquiry",
+                (frame, responder) => ViscaCommandContext.FocusModeInquiry(frame, responder));
+        }
+
+        /// <summary>
+        /// Register a command with exact 3-byte key match (O(1) lookup)
+        /// </summary>
+        public void Register(byte category, byte group, byte subCommand,
+            ViscaCommandType type, string name, CommandParser parser)
+        {
+            int key = (category << 16) | (group << 8) | subCommand;
+            _commandsByKey[key] = new CommandEntry(type, name, parser);
+        }
+
+        /// <summary>
+        /// Register a command that requires additional inspection (falls back to O(n) for these)
+        /// </summary>
+        public void RegisterVariable(ViscaCommandType type, string name, CommandParser parser)
+        {
+            _variableLengthCommands.Add(new CommandEntry(type, name, parser));
+        }
+
+        /// <summary>
+        /// Try to parse and execute a command.
+        /// O(1) for standard commands, O(m) for variable-length commands where m is small.
+        /// </summary>
+        /// <returns>Command context if handled, null if unknown command</returns>
+        public ViscaCommandContext? TryExecute(byte[] frame, IViscaCommandHandler handler, Action<byte[]> responder)
+        {
+            // Require at least 4 bytes for key lookup (address + category + group + subcommand)
+            if (frame == null || frame.Length < 4)
+                return null;
+
+            // O(1) lookup for exact key match
+            int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+            if (_commandsByKey.TryGetValue(key, out var entry))
+            {
+                var contextNullable = entry.Parser(frame, responder);
+                if (contextNullable.HasValue)
+                {
+                    var context = contextNullable.Value;
+                    handler.Handle(in context);
+                    return contextNullable;
                 }
             }
+
+            // Fallback for variable-length commands (Memory commands with sub-type in byte[4])
+            foreach (var varEntry in _variableLengthCommands)
+            {
+                var contextNullable = varEntry.Parser(frame, responder);
+                if (contextNullable.HasValue)
+                {
+                    var context = contextNullable.Value;
+                    handler.Handle(in context);
+                    return contextNullable;
+                }
+            }
+
             return null;
         }
 
         /// <summary>
-        /// Get command name for a frame (for logging purposes)
+        /// Get command name for logging (O(1) for known commands)
         /// </summary>
         public string GetCommandName(byte[] frame)
         {
-            foreach (var command in _commands)
+            if (frame == null || frame.Length < 4)
+                return "Invalid";
+
+            int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+            if (_commandsByKey.TryGetValue(key, out var entry))
+                return entry.Name;
+
+            foreach (var varEntry in _variableLengthCommands)
             {
-                if (command.TryParse(frame))
-                {
-                    return command.CommandName;
-                }
+                if (varEntry.Parser(frame, _ => { }) != null)
+                    return varEntry.Name;
             }
 
-            // Fallback to byte inspection for unknown commands
-            if (frame == null || frame.Length < 5) return "Invalid";
-            byte b1 = frame[1], b2 = frame[2], b3 = frame[3];
-            return $"Unknown({b1:X2} {b2:X2} {b3:X2})";
+            return $"Unknown({frame[1]:X2} {frame[2]:X2} {frame[3]:X2})";
         }
 
         /// <summary>
-        /// Get detailed description for a frame (for logging purposes)
+        /// Get command details for logging.
+        /// Uses lazy description generation to reduce allocations.
         /// </summary>
-        public string GetCommandDetails(byte[] frame)
+        public string GetCommandDetails(byte[] frame, Action<byte[]> responder)
         {
-            foreach (var command in _commands)
+            if (frame == null || frame.Length < 4)
+                return "Invalid frame";
+
+            int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+            if (_commandsByKey.TryGetValue(key, out var entry))
             {
-                if (command.TryParse(frame))
-                {
-                    return command.GetDetails(frame);
-                }
+                var context = entry.Parser(frame, responder);
+                if (context.HasValue)
+                    return context.Value.GetDescription();
             }
 
-            // Fallback for unknown commands
-            string hex = frame != null ? BitConverter.ToString(frame) : "null";
-            string name = GetCommandName(frame);
-            return $"{name} [{hex}]";
+            foreach (var varEntry in _variableLengthCommands)
+            {
+                var context = varEntry.Parser(frame, responder);
+                if (context.HasValue)
+                    return context.Value.GetDescription();
+            }
+
+            return $"Unknown [{BitConverter.ToString(frame)}]";
         }
 
         /// <summary>
-        /// Get all registered commands
+        /// Number of registered commands
         /// </summary>
-        public IReadOnlyList<IViscaCommand> Commands => _commands.AsReadOnly();
+        public int Count => _commandsByKey.Count + _variableLengthCommands.Count;
     }
 }

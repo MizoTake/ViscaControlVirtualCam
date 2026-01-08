@@ -2,296 +2,310 @@ using System;
 
 namespace ViscaControlVirtualCam
 {
-    // Bridges VISCA commands to a PtzModel. Pure C#.
-    public class PtzViscaHandler : IViscaCommandHandler
+    /// <summary>
+    /// Bridges VISCA commands to a PtzModel. Pure C#.
+    /// Implements the unified IViscaCommandHandler interface.
+    /// </summary>
+    public sealed class PtzViscaHandler : IViscaCommandHandler
     {
         private readonly PtzModel _model;
         private readonly Action<Action> _mainThreadDispatcher;
         private readonly ViscaReplyMode _replyMode;
         private readonly Action<string> _logger;
-        private byte _focusMode = 0x03; // Default: Manual
+        private byte _focusMode = ViscaProtocol.FocusModeManual;
 
         public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode, Action<string> logger = null)
         {
-            _model = model;
-            _mainThreadDispatcher = mainThreadDispatcher ?? (_ => { });
+            _model = model ?? throw new ArgumentNullException(nameof(model));
+            _mainThreadDispatcher = mainThreadDispatcher ?? throw new ArgumentNullException(nameof(mainThreadDispatcher));
             _replyMode = replyMode;
             _logger = logger;
         }
 
-        private static void SendAck(Action<byte[]> responder, ViscaReplyMode mode)
+        public bool Handle(in ViscaCommandContext ctx)
         {
-            if (mode == ViscaReplyMode.None) return;
-            responder(new byte[] { 0x90, 0x40, 0xFF });
+            return ctx.CommandType switch
+            {
+                // Pan/Tilt commands
+                ViscaCommandType.PanTiltDrive => HandlePanTiltDrive(ctx),
+                ViscaCommandType.PanTiltAbsolute => HandlePanTiltAbsolute(ctx),
+                ViscaCommandType.PanTiltHome => HandleHome(ctx),
+                ViscaCommandType.PanTiltReset => HandlePanTiltReset(ctx),
+
+                // Zoom commands
+                ViscaCommandType.ZoomVariable => HandleZoomVariable(ctx),
+                ViscaCommandType.ZoomDirect => HandleZoomDirect(ctx),
+
+                // Focus commands
+                ViscaCommandType.FocusVariable => HandleFocusVariable(ctx),
+                ViscaCommandType.FocusDirect => HandleFocusDirect(ctx),
+                ViscaCommandType.FocusMode => HandleFocusMode(ctx),
+                ViscaCommandType.FocusOnePush => HandleFocusOnePush(ctx),
+
+                // Iris commands
+                ViscaCommandType.IrisVariable => HandleIrisVariable(ctx),
+                ViscaCommandType.IrisDirect => HandleIrisDirect(ctx),
+
+                // Memory commands
+                ViscaCommandType.MemoryRecall => HandleMemoryRecall(ctx),
+                ViscaCommandType.MemorySet => HandleMemorySet(ctx),
+                ViscaCommandType.MemoryReset => HandleMemoryReset(ctx),
+
+                // Inquiry commands
+                ViscaCommandType.PanTiltPositionInquiry => HandlePanTiltPositionInquiry(ctx),
+                ViscaCommandType.ZoomPositionInquiry => HandleZoomPositionInquiry(ctx),
+                ViscaCommandType.FocusPositionInquiry => HandleFocusPositionInquiry(ctx),
+                ViscaCommandType.FocusModeInquiry => HandleFocusModeInquiry(ctx),
+
+                _ => false
+            };
         }
 
-        private static void SendCompletion(Action<byte[]> responder, ViscaReplyMode mode)
+        public void HandleError(byte[] frame, Action<byte[]> responder, byte errorCode)
         {
-            if (mode != ViscaReplyMode.AckAndCompletion) return;
-            responder(new byte[] { 0x90, 0x50, 0xFF });
+            ViscaResponse.SendError(responder, errorCode);
         }
 
-        private static void SendError(Action<byte[]> responder, byte ee, ViscaReplyMode mode)
+        private bool HandlePanTiltDrive(in ViscaCommandContext ctx)
         {
-            if (mode == ViscaReplyMode.None) return;
-            responder(new byte[] { 0x90, 0x60, ee, 0xFF });
-        }
-
-        public bool HandlePanTiltDrive(byte panSpeed, byte tiltSpeed, byte panDir, byte tiltDir, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            var pdir = ViscaParser.DirFromVisca(panDir);
-            var tdir = ViscaParser.DirFromVisca(tiltDir);
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var pdir = ViscaParser.DirFromVisca(ctx.PanDirection);
+            var tdir = ViscaParser.DirFromVisca(ctx.TiltDirection);
+            var responder = ctx.Responder;
+            byte panSpeed = ctx.PanSpeed;
+            byte tiltSpeed = ctx.TiltSpeed;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandPanTiltVariable(panSpeed, tiltSpeed, pdir, tdir);
-                SendCompletion(responder, _replyMode);
+                ViscaResponse.SendCompletion(responder, _replyMode);
             });
             return true;
         }
 
-        public bool HandleZoomVariable(byte zz, Action<byte[]> responder)
+        private bool HandlePanTiltAbsolute(in ViscaCommandContext ctx)
         {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandZoomVariable(zz);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        public bool HandlePanTiltAbsolute(byte panSpeed, byte tiltSpeed, ushort panPos, ushort tiltPos, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            ushort panPos = ctx.PanPosition;
+            ushort tiltPos = ctx.TiltPosition;
+            byte panSpeed = ctx.PanSpeed;
+            byte tiltSpeed = ctx.TiltSpeed;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandPanTiltAbsolute(panSpeed, tiltSpeed, panPos, tiltPos);
-                SendCompletion(responder, _replyMode);
+                ViscaResponse.SendCompletion(responder, _replyMode);
             });
             return true;
         }
 
-        // Blackmagic PTZ Control: Zoom Direct
-        public bool HandleZoomDirect(ushort zoomPos, Action<byte[]> responder)
+        private bool HandleHome(in ViscaCommandContext ctx)
         {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandZoomDirect(zoomPos);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        // Blackmagic PTZ Control: Focus Variable
-        public bool HandleFocusVariable(byte focusSpeed, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandFocusVariable(focusSpeed);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        // Blackmagic PTZ Control: Focus Direct
-        public bool HandleFocusDirect(ushort focusPos, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandFocusDirect(focusPos);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        // Blackmagic PTZ Control: Iris Variable
-        public bool HandleIrisVariable(byte irisDir, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandIrisVariable(irisDir);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        // Blackmagic PTZ Control: Iris Direct
-        public bool HandleIrisDirect(ushort irisPos, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandIrisDirect(irisPos);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        // Blackmagic PTZ Control: Memory Recall
-        public bool HandleMemoryRecall(byte memoryNumber, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandMemoryRecall(memoryNumber);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        // Blackmagic PTZ Control: Memory Set
-        public bool HandleMemorySet(byte memoryNumber, Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandMemorySet(memoryNumber);
-                SendCompletion(responder, _replyMode);
-            });
-            return true;
-        }
-
-        // Standard VISCA: Pan/Tilt Home
-        public bool HandleHome(Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandHome();
-                SendCompletion(responder, _replyMode);
+                ViscaResponse.SendCompletion(responder, _replyMode);
             });
             return true;
         }
 
-        // Memory Reset
-        public bool HandleMemoryReset(byte memoryNumber, Action<byte[]> responder)
+        private bool HandlePanTiltReset(in ViscaCommandContext ctx)
         {
-            SendAck(responder, _replyMode);
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
             _mainThreadDispatcher(() =>
             {
-                _model.DeletePreset(memoryNumber);
-                SendCompletion(responder, _replyMode);
+                _model.CommandPanTiltAbsolute(0, 0, ViscaProtocol.PositionCenter, ViscaProtocol.PositionCenter);
+                ViscaResponse.SendCompletion(responder, _replyMode);
             });
             return true;
         }
 
-        // Pan/Tilt Reset to center
-        public bool HandlePanTiltReset(Action<byte[]> responder)
+        private bool HandleZoomVariable(in ViscaCommandContext ctx)
         {
-            SendAck(responder, _replyMode);
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            byte zoomSpeed = ctx.ZoomSpeed;
             _mainThreadDispatcher(() =>
             {
-                // Reset to center position (0, 0)
-                _model.CommandPanTiltAbsolute(0, 0, 0x8000, 0x8000);
-                SendCompletion(responder, _replyMode);
+                _model.CommandZoomVariable(zoomSpeed);
+                ViscaResponse.SendCompletion(responder, _replyMode);
             });
             return true;
         }
 
-        // Focus Mode (Auto/Manual) - Unity Camera doesn't support auto focus, log only
-        public bool HandleFocusMode(byte mode, Action<byte[]> responder)
+        private bool HandleZoomDirect(in ViscaCommandContext ctx)
         {
-            SendAck(responder, _replyMode);
-            _focusMode = mode;
-            string modeName = mode switch { 0x02 => "Auto", 0x03 => "Manual", _ => $"0x{mode:X2}" };
-            _logger?.Invoke($"[VISCA] Focus Mode: {modeName} (Unity Camera does not support auto focus)");
-            SendCompletion(responder, _replyMode);
-            return true;
-        }
-
-        // Focus One Push AF - Unity Camera doesn't support auto focus, log only
-        public bool HandleFocusOnePush(Action<byte[]> responder)
-        {
-            SendAck(responder, _replyMode);
-            _logger?.Invoke($"[VISCA] Focus One Push AF (Unity Camera does not support auto focus)");
-            SendCompletion(responder, _replyMode);
-            return true;
-        }
-
-        // Inquiry: Pan/Tilt Position
-        public bool HandlePanTiltPositionInquiry(Action<byte[]> responder)
-        {
-            // Convert current position to VISCA format
-            float panDeg = _model.CurrentPanDeg;
-            float tiltDeg = _model.CurrentTiltDeg;
-
-            // Map to 0-65535 range
-            float panNorm = (panDeg - _model.PanMinDeg) / (_model.PanMaxDeg - _model.PanMinDeg);
-            float tiltNorm = (tiltDeg - _model.TiltMinDeg) / (_model.TiltMaxDeg - _model.TiltMinDeg);
-            ushort panPos = (ushort)(panNorm * 65535f);
-            ushort tiltPos = (ushort)(tiltNorm * 65535f);
-
-            // Encode as nibbles: Y0 50 0p 0p 0p 0p 0t 0t 0t 0t FF
-            responder(new byte[]
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            ushort zoomPos = ctx.ZoomPosition;
+            _mainThreadDispatcher(() =>
             {
-                0x90, 0x50,
-                (byte)((panPos >> 12) & 0x0F),
-                (byte)((panPos >> 8) & 0x0F),
-                (byte)((panPos >> 4) & 0x0F),
-                (byte)(panPos & 0x0F),
-                (byte)((tiltPos >> 12) & 0x0F),
-                (byte)((tiltPos >> 8) & 0x0F),
-                (byte)((tiltPos >> 4) & 0x0F),
-                (byte)(tiltPos & 0x0F),
-                0xFF
+                _model.CommandZoomDirect(zoomPos);
+                ViscaResponse.SendCompletion(responder, _replyMode);
             });
             return true;
         }
 
-        // Inquiry: Zoom Position
-        public bool HandleZoomPositionInquiry(Action<byte[]> responder)
+        private bool HandleFocusVariable(in ViscaCommandContext ctx)
         {
-            // Convert FOV to zoom position (inverse relationship)
-            float fovNorm = (_model.CurrentFovDeg - _model.MinFov) / (_model.MaxFov - _model.MinFov);
-            ushort zoomPos = (ushort)((1.0f - fovNorm) * 65535f); // Inverted: small FOV = high zoom
-
-            // Encode as nibbles: Y0 50 0p 0p 0p 0p FF
-            responder(new byte[]
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            byte focusSpeed = ctx.FocusSpeed;
+            _mainThreadDispatcher(() =>
             {
-                0x90, 0x50,
-                (byte)((zoomPos >> 12) & 0x0F),
-                (byte)((zoomPos >> 8) & 0x0F),
-                (byte)((zoomPos >> 4) & 0x0F),
-                (byte)(zoomPos & 0x0F),
-                0xFF
+                _model.CommandFocusVariable(focusSpeed);
+                ViscaResponse.SendCompletion(responder, _replyMode);
             });
             return true;
         }
 
-        // Inquiry: Focus Position
-        public bool HandleFocusPositionInquiry(Action<byte[]> responder)
+        private bool HandleFocusDirect(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            ushort focusPos = ctx.FocusPosition;
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandFocusDirect(focusPos);
+                ViscaResponse.SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        private bool HandleFocusMode(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            _focusMode = ctx.FocusMode;
+            string modeName = ctx.FocusMode == ViscaProtocol.FocusModeAuto ? "Auto" : "Manual";
+            _logger?.Invoke($"Focus Mode: {modeName} (Unity Camera does not support auto focus)");
+            ViscaResponse.SendCompletion(ctx.Responder, _replyMode);
+            return true;
+        }
+
+        private bool HandleFocusOnePush(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            _logger?.Invoke("Focus One Push AF (Unity Camera does not support auto focus)");
+            ViscaResponse.SendCompletion(ctx.Responder, _replyMode);
+            return true;
+        }
+
+        private bool HandleIrisVariable(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            byte irisDir = ctx.IrisDirection;
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandIrisVariable(irisDir);
+                ViscaResponse.SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        private bool HandleIrisDirect(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            ushort irisPos = ctx.IrisPosition;
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandIrisDirect(irisPos);
+                ViscaResponse.SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        private bool HandleMemoryRecall(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            byte memNum = ctx.MemoryNumber;
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandMemoryRecall(memNum);
+                ViscaResponse.SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        private bool HandleMemorySet(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            byte memNum = ctx.MemoryNumber;
+            _mainThreadDispatcher(() =>
+            {
+                _model.CommandMemorySet(memNum);
+                ViscaResponse.SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        private bool HandleMemoryReset(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendAck(ctx.Responder, _replyMode);
+            var responder = ctx.Responder;
+            byte memNum = ctx.MemoryNumber;
+            _mainThreadDispatcher(() =>
+            {
+                _model.DeletePreset(memNum);
+                ViscaResponse.SendCompletion(responder, _replyMode);
+            });
+            return true;
+        }
+
+        private bool HandlePanTiltPositionInquiry(in ViscaCommandContext ctx)
+        {
+            float panRange = _model.PanMaxDeg - _model.PanMinDeg;
+            float tiltRange = _model.TiltMaxDeg - _model.TiltMinDeg;
+
+            // Avoid division by zero using consistent epsilon
+            float panNorm = panRange > ViscaProtocol.DivisionEpsilon
+                ? (_model.CurrentPanDeg - _model.PanMinDeg) / panRange
+                : 0.5f;
+            float tiltNorm = tiltRange > ViscaProtocol.DivisionEpsilon
+                ? (_model.CurrentTiltDeg - _model.TiltMinDeg) / tiltRange
+                : 0.5f;
+
+            ushort panPos = (ushort)(Clamp01(panNorm) * 65535f);
+            ushort tiltPos = (ushort)(Clamp01(tiltNorm) * 65535f);
+
+            ViscaResponse.SendInquiryResponse32(ctx.Responder, panPos, tiltPos);
+            return true;
+        }
+
+        private bool HandleZoomPositionInquiry(in ViscaCommandContext ctx)
+        {
+            float fovRange = _model.MaxFov - _model.MinFov;
+
+            // Avoid division by zero using consistent epsilon
+            float fovNorm = fovRange > ViscaProtocol.DivisionEpsilon
+                ? (_model.CurrentFovDeg - _model.MinFov) / fovRange
+                : 0.5f;
+
+            // Inverted: small FOV = high zoom position
+            ushort zoomPos = (ushort)((1.0f - Clamp01(fovNorm)) * 65535f);
+
+            ViscaResponse.SendInquiryResponse16(ctx.Responder, zoomPos);
+            return true;
+        }
+
+        private bool HandleFocusPositionInquiry(in ViscaCommandContext ctx)
         {
             ushort focusPos = (ushort)_model.CurrentFocus;
-
-            // Encode as nibbles: Y0 50 0p 0p 0p 0p FF
-            responder(new byte[]
-            {
-                0x90, 0x50,
-                (byte)((focusPos >> 12) & 0x0F),
-                (byte)((focusPos >> 8) & 0x0F),
-                (byte)((focusPos >> 4) & 0x0F),
-                (byte)(focusPos & 0x0F),
-                0xFF
-            });
+            ViscaResponse.SendInquiryResponse16(ctx.Responder, focusPos);
             return true;
         }
 
-        // Inquiry: Focus Mode
-        public bool HandleFocusModeInquiry(Action<byte[]> responder)
+        private bool HandleFocusModeInquiry(in ViscaCommandContext ctx)
         {
-            // Y0 50 02/03 FF (02=Auto, 03=Manual)
-            responder(new byte[] { 0x90, 0x50, _focusMode, 0xFF });
+            ViscaResponse.SendInquiryResponse8(ctx.Responder, _focusMode);
             return true;
         }
 
-        public void HandleSyntaxError(byte[] frame, Action<byte[]> responder)
-        {
-            SendError(responder, 0x02, _replyMode);
-        }
+        private static float Clamp01(float v) => v < 0f ? 0f : (v > 1f ? 1f : v);
     }
 }

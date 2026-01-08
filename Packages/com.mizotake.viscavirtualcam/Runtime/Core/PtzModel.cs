@@ -420,7 +420,7 @@ namespace ViscaControlVirtualCam
         private static float MapSpeed(byte v, byte vmin, byte vmax, float maxDegPerSec, float gamma)
         {
             if (v == 0x00) v = vmin;
-            float t = InverseLerp(vmin, vmax, Clamp(v, vmin, vmax));
+            float t = SafeInverseLerp(vmin, vmax, Clamp(v, vmin, vmax));
             float mapped = (float)Math.Pow(t, Math.Max(0.01f, gamma));
             return mapped * maxDegPerSec;
         }
@@ -432,7 +432,17 @@ namespace ViscaControlVirtualCam
         }
 
         private static float Lerp(float a, float b, float t) => a + (b - a) * t;
-        private static float InverseLerp(float a, float b, float v) => (v - a) / (b - a);
+
+        /// <summary>
+        /// Safe inverse lerp that handles equal min/max (returns 0.5 instead of NaN/Infinity).
+        /// </summary>
+        private static float SafeInverseLerp(float a, float b, float v)
+        {
+            float range = b - a;
+            if (Math.Abs(range) < ViscaProtocol.DivisionEpsilon) return 0.5f;
+            return (v - a) / range;
+        }
+
         private static float Clamp(float v, float min, float max) => v < min ? min : (v > max ? max : v);
         private static int Clamp(int v, int min, int max) => v < min ? min : (v > max ? max : v);
         private static float DeltaAngle(float a, float b)

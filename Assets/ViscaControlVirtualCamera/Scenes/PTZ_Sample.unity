@@ -38,6 +38,7 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
+  m_IndirectSpecularColor: {r: 0.18028378, g: 0.22571412, b: 0.30692285, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
@@ -361,12 +362,14 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   autoStart: 1
-  transport: 0
+  transport: 2
   udpPort: 52381
   tcpPort: 52380
   maxClients: 4
   replyMode: 2
   verboseLog: 1
+  logReceivedCommands: 1
+  logLevel: 4
   ptzController: {fileID: 1474640884}
 --- !u!4 &1167733020
 Transform:
@@ -508,6 +511,8 @@ MonoBehaviour:
   tiltPivot: {fileID: 267442196}
   targetCamera: {fileID: 838327174}
   settings: {fileID: 11400000, guid: ab193120e59bb9146bf48dfec2b1728e, type: 2}
+  enablePersistentMemory: 1
+  prefsKeyPrefix: ViscaPtz_
 --- !u!4 &1474640885
 Transform:
   m_ObjectHideFlags: 0

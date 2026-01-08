@@ -5,20 +5,25 @@ using System.Threading;
 
 namespace ViscaControlVirtualCam
 {
-    public class ViscaServerOptions
+    /// <summary>
+    /// Configuration for ViscaServerCore.
+    /// </summary>
+    public sealed class ViscaServerOptions
     {
         public ViscaTransport Transport = ViscaTransport.UdpRawVisca;
-        public int UdpPort = 52381;
-        public int TcpPort = 52380;
+        public int UdpPort = ViscaProtocol.DefaultUdpPort;
+        public int TcpPort = ViscaProtocol.DefaultTcpPort;
         public int MaxClients = 4;
         public bool VerboseLog = true;
-        public bool LogReceivedCommands = true; // Log every received VISCA command with details
-        public Action<string> Logger = null; // optional
-        public int MaxFrameSize = 4096; // guard for malformed streams
+        public bool LogReceivedCommands = true;
+        public Action<string> Logger = null;
+        public int MaxFrameSize = 4096;
     }
 
-    // Pure C# server core. No Unity/MonoBehaviour dependencies.
-    public class ViscaServerCore : IDisposable
+    /// <summary>
+    /// Pure C# VISCA server core. No Unity/MonoBehaviour dependencies.
+    /// </summary>
+    public sealed class ViscaServerCore : IDisposable
     {
         private readonly IViscaCommandHandler _handler;
         private readonly ViscaServerOptions _opt;
@@ -29,9 +34,12 @@ namespace ViscaControlVirtualCam
         private readonly System.Collections.Concurrent.ConcurrentDictionary<TcpClient, ViscaFrameFramer> _clients = new();
         private int _clientCount = 0;
 
+        // Reusable empty responder to avoid allocations during command name lookup
+        private static readonly Action<byte[]> EmptyResponder = _ => { };
+
         public ViscaServerCore(IViscaCommandHandler handler, ViscaServerOptions options)
         {
-            _handler = handler;
+            _handler = handler ?? throw new ArgumentNullException(nameof(handler));
             _opt = options ?? new ViscaServerOptions();
             _commandRegistry = new ViscaCommandRegistry();
         }
@@ -197,44 +205,52 @@ namespace ViscaControlVirtualCam
             // Format: 01 XX XX XX (MD and SN) followed by 00 00 00 XX (reserved) + actual VISCA command
             if (frame.Length > 8 && frame[0] == 0x01 && frame[1] == 0x00 && frame[2] == 0x00)
             {
-                // Likely VISCA over IP format: skip first 8 bytes
                 byte[] viscaFrame = new byte[frame.Length - 8];
                 Array.Copy(frame, 8, viscaFrame, 0, viscaFrame.Length);
                 frame = viscaFrame;
-                Log($"Stripped VISCA over IP header, processing raw VISCA command");
+                Log("Stripped VISCA over IP header");
             }
 
-            if (frame[^1] != 0xFF)
+            // Validate frame
+            if (frame.Length < ViscaProtocol.MinFrameLength)
             {
-                Log($"Invalid VISCA frame (no terminator): {BitConverter.ToString(frame)}");
-                _handler.HandleSyntaxError(frame, send);
+                Log($"Frame too short: {frame.Length} bytes");
+                _handler.HandleError(frame, send, ViscaProtocol.ErrorMessageLength);
                 return;
             }
+
+            if (frame[^1] != ViscaProtocol.FrameTerminator)
+            {
+                Log($"Invalid VISCA frame (no terminator): {BitConverter.ToString(frame)}");
+                _handler.HandleError(frame, send, ViscaProtocol.ErrorSyntax);
+                return;
+            }
+
             if (frame.Length > _opt.MaxFrameSize)
             {
                 Log($"Frame too large: {frame.Length} bytes");
+                _handler.HandleError(frame, send, ViscaProtocol.ErrorMessageLength);
                 return;
             }
 
-            // Log received command with details
+            // Log received command (only generate details string when logging enabled)
             if (_opt.LogReceivedCommands)
             {
-                string details = _commandRegistry.GetCommandDetails(frame);
+                string details = _commandRegistry.GetCommandDetails(frame, send);
                 Log($"RX: {details}");
             }
 
-            // Try to execute command through registry
-            var command = _commandRegistry.TryExecute(frame, _handler, send);
-            if (command != null)
+            // Try to execute command through registry (O(1) lookup for most commands)
+            var context = _commandRegistry.TryExecute(frame, _handler, send);
+            if (context.HasValue)
             {
-                // Command was handled successfully
                 return;
             }
 
-            // Unknown command
+            // Unknown command - send error response
             string cmdName = _commandRegistry.GetCommandName(frame);
-            Log($"WARNING: Command not handled: {cmdName}");
-            // Intentionally no error; we just log.
+            Log($"WARNING: Unknown command: {cmdName}");
+            _handler.HandleError(frame, send, ViscaProtocol.ErrorSyntax);
         }
 
         private void Log(string msg)

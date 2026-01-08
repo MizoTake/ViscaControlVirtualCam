@@ -24,6 +24,7 @@ namespace ViscaControlVirtualCam
         public void ApplyTo(PtzModel model)
         {
             if (model == null) return;
+
             model.PanMaxDegPerSec = panMaxDegPerSec;
             model.TiltMaxDegPerSec = tiltMaxDegPerSec;
             model.ZoomMaxFovPerSec = zoomMaxFovPerSec;
@@ -38,7 +39,6 @@ namespace ViscaControlVirtualCam
             model.PanVmin = panVmin;
             model.PanVmax = panVmax;
             model.TiltVmin = tiltVmin;
-            model.TiltVmax = tiltMaxDeg > tiltMinDeg ? tiltVmax : tiltVmin; // keep as set
             model.TiltVmax = tiltVmax;
         }
     }
