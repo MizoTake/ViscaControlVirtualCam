@@ -34,6 +34,22 @@ namespace ViscaControlVirtualCam
         private readonly System.Collections.Concurrent.ConcurrentDictionary<TcpClient, ViscaFrameFramer> _clients = new();
         private int _clientCount = 0;
 
+        private readonly struct ViscaIpEnvelope
+        {
+            public readonly byte TypeMsb;
+            public readonly byte TypeLsb;
+            public readonly ushort PayloadLength;
+            public readonly uint Sequence;
+
+            public ViscaIpEnvelope(byte typeMsb, byte typeLsb, ushort payloadLength, uint sequence)
+            {
+                TypeMsb = typeMsb;
+                TypeLsb = typeLsb;
+                PayloadLength = payloadLength;
+                Sequence = sequence;
+            }
+        }
+
         // Reusable empty responder to avoid allocations during command name lookup
         private static readonly Action<byte[]> EmptyResponder = _ => { };
 
@@ -197,51 +213,57 @@ namespace ViscaControlVirtualCam
             }
         }
 
-        private void ProcessFrame(byte[] frame, Action<byte[]> send)
+        private void ProcessFrame(byte[] packet, Action<byte[]> rawSend)
         {
-            if (frame == null || frame.Length == 0) return;
+            if (packet == null || packet.Length == 0) return;
 
-            // Strip VISCA over IP header if present
-            // Format: 01 XX XX XX (MD and SN) followed by 00 00 00 XX (reserved) + actual VISCA command
-            if (frame.Length > 8 && frame[0] == 0x01 && frame[1] == 0x00 && frame[2] == 0x00)
+            byte[] frame = packet;
+            Action<byte[]> responder = rawSend;
+
+            if (TryParseViscaIpEnvelope(packet, out var envelope, out var payload, out var headerError))
             {
-                byte[] viscaFrame = new byte[frame.Length - 8];
-                Array.Copy(frame, 8, viscaFrame, 0, viscaFrame.Length);
-                frame = viscaFrame;
-                Log("Stripped VISCA over IP header");
+                responder = WrapResponderWithViscaIpHeader(rawSend, in envelope);
+                frame = payload;
+
+                if (!string.IsNullOrEmpty(headerError))
+                {
+                    Log(headerError);
+                    _handler.HandleError(frame, responder, ViscaProtocol.ErrorMessageLength);
+                    return;
+                }
             }
 
             // Validate frame
             if (frame.Length < ViscaProtocol.MinFrameLength)
             {
                 Log($"Frame too short: {frame.Length} bytes");
-                _handler.HandleError(frame, send, ViscaProtocol.ErrorMessageLength);
+                _handler.HandleError(frame, responder, ViscaProtocol.ErrorMessageLength);
                 return;
             }
 
             if (frame[^1] != ViscaProtocol.FrameTerminator)
             {
                 Log($"Invalid VISCA frame (no terminator): {BitConverter.ToString(frame)}");
-                _handler.HandleError(frame, send, ViscaProtocol.ErrorSyntax);
+                _handler.HandleError(frame, responder, ViscaProtocol.ErrorSyntax);
                 return;
             }
 
             if (frame.Length > _opt.MaxFrameSize)
             {
                 Log($"Frame too large: {frame.Length} bytes");
-                _handler.HandleError(frame, send, ViscaProtocol.ErrorMessageLength);
+                _handler.HandleError(frame, responder, ViscaProtocol.ErrorMessageLength);
                 return;
             }
 
             // Log received command (only generate details string when logging enabled)
             if (_opt.LogReceivedCommands)
             {
-                string details = _commandRegistry.GetCommandDetails(frame, send);
+                string details = _commandRegistry.GetCommandDetails(frame, responder);
                 Log($"RX: {details}");
             }
 
             // Try to execute command through registry (O(1) lookup for most commands)
-            var context = _commandRegistry.TryExecute(frame, _handler, send);
+            var context = _commandRegistry.TryExecute(frame, _handler, responder);
             if (context.HasValue)
             {
                 return;
@@ -250,7 +272,91 @@ namespace ViscaControlVirtualCam
             // Unknown command - send error response
             string cmdName = _commandRegistry.GetCommandName(frame);
             Log($"WARNING: Unknown command: {cmdName}");
-            _handler.HandleError(frame, send, ViscaProtocol.ErrorSyntax);
+            _handler.HandleError(frame, responder, ViscaProtocol.ErrorSyntax);
+        }
+
+        private bool TryParseViscaIpEnvelope(byte[] packet, out ViscaIpEnvelope envelope, out byte[] payload, out string error)
+        {
+            envelope = default;
+            payload = packet;
+            error = null;
+
+            if (packet == null || packet.Length < ViscaProtocol.ViscaIpHeaderLength)
+                return false;
+
+            byte typeMsb = packet[0];
+            byte typeLsb = packet[1];
+            bool looksLikeHeader = typeMsb == ViscaProtocol.IpPayloadTypeMsbVisca || typeMsb == ViscaProtocol.IpPayloadTypeMsbControl;
+            if (!looksLikeHeader)
+                return false;
+
+            envelope = new ViscaIpEnvelope(
+                typeMsb,
+                typeLsb,
+                (ushort)((packet[2] << 8) | packet[3]),
+                (uint)((packet[4] << 24) | (packet[5] << 16) | (packet[6] << 8) | packet[7]));
+
+            int declaredLength = envelope.PayloadLength;
+            int actualLength = packet.Length - ViscaProtocol.ViscaIpHeaderLength;
+
+            // Copy available payload for downstream socket extraction even if invalid
+            int copyLength = Math.Max(0, Math.Min(actualLength, declaredLength > 0 ? declaredLength : actualLength));
+            payload = new byte[copyLength];
+            if (copyLength > 0)
+            {
+                Buffer.BlockCopy(packet, ViscaProtocol.ViscaIpHeaderLength, payload, 0, copyLength);
+            }
+
+            bool supportedPayloadType =
+                (typeMsb == ViscaProtocol.IpPayloadTypeMsbVisca &&
+                    (typeLsb == ViscaProtocol.IpPayloadTypeLsbCommand ||
+                     typeLsb == ViscaProtocol.IpPayloadTypeLsbInquiry ||
+                     typeLsb == ViscaProtocol.IpPayloadTypeLsbReply)) ||
+                (typeMsb == ViscaProtocol.IpPayloadTypeMsbControl &&
+                     typeLsb == ViscaProtocol.IpPayloadTypeLsbControlCommand);
+
+            if (!supportedPayloadType)
+            {
+                error = $"Unsupported VISCA IP payload type: {typeMsb:X2}{typeLsb:X2}";
+                return true;
+            }
+
+            if (declaredLength <= 0 || declaredLength > _opt.MaxFrameSize)
+            {
+                error = $"Invalid VISCA IP payload length: {declaredLength}";
+                return true;
+            }
+
+            if (actualLength != declaredLength)
+            {
+                error = $"VISCA IP payload length mismatch: expected {declaredLength}, got {actualLength}";
+                return true;
+            }
+
+            payload = new byte[declaredLength];
+            Buffer.BlockCopy(packet, ViscaProtocol.ViscaIpHeaderLength, payload, 0, declaredLength);
+            return true;
+        }
+
+        private Action<byte[]> WrapResponderWithViscaIpHeader(Action<byte[]> rawSend, in ViscaIpEnvelope envelope)
+        {
+            return payload =>
+            {
+                if (payload == null) return;
+
+                ushort length = (ushort)Math.Min(payload.Length, _opt.MaxFrameSize);
+                byte[] packet = new byte[ViscaProtocol.ViscaIpHeaderLength + length];
+                packet[0] = ViscaProtocol.IpPayloadTypeMsbVisca;
+                packet[1] = ViscaProtocol.IpPayloadTypeLsbReply;
+                packet[2] = (byte)((length >> 8) & 0xFF);
+                packet[3] = (byte)(length & 0xFF);
+                packet[4] = (byte)((envelope.Sequence >> 24) & 0xFF);
+                packet[5] = (byte)((envelope.Sequence >> 16) & 0xFF);
+                packet[6] = (byte)((envelope.Sequence >> 8) & 0xFF);
+                packet[7] = (byte)(envelope.Sequence & 0xFF);
+                Buffer.BlockCopy(payload, 0, packet, ViscaProtocol.ViscaIpHeaderLength, length);
+                rawSend(packet);
+            };
         }
 
         private void Log(string msg)

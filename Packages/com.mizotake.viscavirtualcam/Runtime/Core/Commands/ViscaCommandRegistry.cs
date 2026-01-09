@@ -45,6 +45,15 @@ namespace ViscaControlVirtualCam
 
         private void RegisterDefaultCommands()
         {
+            // Command Cancel: 8X 2Z FF (Z=socket). Minimal length 3 bytes.
+            RegisterVariable(ViscaCommandType.CommandCancel, "CommandCancel",
+                (frame, responder) =>
+                {
+                    if (frame.Length == 3 && (frame[1] & 0xF0) == 0x20 && frame[2] == ViscaProtocol.FrameTerminator)
+                        return ViscaCommandContext.CommandCancel(frame, responder);
+                    return null;
+                });
+
             // Pan/Tilt Drive: 8X 01 06 01 VV WW PP TT FF
             Register(0x01, 0x06, 0x01, ViscaCommandType.PanTiltDrive, "PanTiltDrive",
                 (frame, responder) =>

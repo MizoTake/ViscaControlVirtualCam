@@ -39,3 +39,7 @@
 
 ## Agent-Specific Notes
 - Scope your edits to `Assets/ViscaControlVirtualCamera/` unless explicitly requested. Respect these guidelines across the entire repo tree.
+- VISCA over IP behavior: replies must echo the socket nibble (low 4 bits) in `90 4z/5z/6z` and, when an 8-byte VISCA-IP header is received, responses should include a `0x01 0x11` header that mirrors the incoming sequence. Default ports are UDP 52381 / TCP 52380.
+- Command Cancel: `8X 2Z FF` is a valid control command and should return `90 6z 04 FF` (CommandCanceled) using the socket from the `2Z` byte.
+- Tests: new EditMode tests live under `Packages/com.mizotake.viscavirtualcam/Tests/EditMode/` (e.g., `ViscaResponseTests.cs`) and verify socket-aware replies and cancel handling.
+- ドキュメント更新ルール: コード/テストに仕様変更・機能追加を入れた場合は、必ず対応する文書（`Packages/com.mizotake.viscavirtualcam/Documentation~/` 配下や README 類）も更新すること。

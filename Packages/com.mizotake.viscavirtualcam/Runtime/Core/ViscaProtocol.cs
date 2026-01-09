@@ -6,12 +6,23 @@ namespace ViscaControlVirtualCam
     /// </summary>
     public static class ViscaProtocol
     {
+        public const byte DefaultSocketId = 0x01;
+
         // Frame structure
         public const byte FrameTerminator = 0xFF;
         public const byte AddressBroadcast = 0x88;
         public const byte AddressCamera1 = 0x81;
         public const int MinFrameLength = 3; // Address + Command + Terminator
         public const int MaxFrameLength = 16;
+
+        // VISCA over IP header
+        public const int ViscaIpHeaderLength = 8;
+        public const byte IpPayloadTypeMsbVisca = 0x01;
+        public const byte IpPayloadTypeLsbCommand = 0x00;
+        public const byte IpPayloadTypeLsbInquiry = 0x10;
+        public const byte IpPayloadTypeLsbReply = 0x11;
+        public const byte IpPayloadTypeMsbControl = 0x02;
+        public const byte IpPayloadTypeLsbControlCommand = 0x00;
 
         // Command categories (byte[1])
         public const byte CategoryCommand = 0x01;
@@ -84,6 +95,26 @@ namespace ViscaControlVirtualCam
         /// Epsilon for safe floating-point division (avoid NaN/Infinity).
         /// </summary>
         public const float DivisionEpsilon = 0.001f;
+
+        /// <summary>
+        /// Extract socket id from VISCA payload (lower nibble of first byte).
+        /// Falls back to DefaultSocketId when unavailable or zero.
+        /// </summary>
+        public static byte ExtractSocketId(byte[] frame)
+        {
+            if (frame == null || frame.Length == 0)
+                return DefaultSocketId;
+
+            // Command Cancel encodes socket in byte[1] low nibble (format: 8X 2Z FF)
+            if (frame.Length >= 2 && (frame[1] & 0xF0) == 0x20)
+            {
+                byte cancelSocket = (byte)(frame[1] & 0x0F);
+                if (cancelSocket != 0) return cancelSocket;
+            }
+
+            byte socket = (byte)(frame[0] & 0x0F);
+            return socket == 0 ? DefaultSocketId : socket;
+        }
     }
 
     /// <summary>
