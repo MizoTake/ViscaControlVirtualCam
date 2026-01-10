@@ -45,3 +45,4 @@
 - ドキュメント更新ルール: コード/テストに仕様変更・機能追加を入れた場合は、必ず対応する文書（`Packages/com.mizotake.viscavirtualcam/Documentation~/` 配下や README 類）も更新すること。
 - 実装メモ: コマンド処理キュー上限（既定64）は `ViscaServerBehaviour.pendingQueueLimit` で調整可能。ビジー時は `Buffer Full(0x03)` を返す。
 - 実装メモ: Pan/Tilt の制御向きは `PtzSettings` の `invertPan`/`invertTilt` で反転設定できる。
+- 参照ドキュメント: ソニー FR7 VISCA over IP 仕様書（ILME-FR7_OH_5042055031） https://www.sony.jp/professional/support/manual_pdf/c_c/ILME-FR7_OH_5042055031.pdf （必要に応じて確認すること）。
