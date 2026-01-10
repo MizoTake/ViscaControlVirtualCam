@@ -21,6 +21,13 @@ namespace ViscaControlVirtualCam
         [Tooltip("Pan speed min/max VISCA values")] public byte panVmin = 0x01, panVmax = 0x18;
         [Tooltip("Tilt speed min/max VISCA values")] public byte tiltVmin = 0x01, tiltVmax = 0x14;
 
+        [Header("Control Options")]
+        [Tooltip("Invert horizontal control (Left/Right)")]
+        public bool invertPan;
+
+        [Tooltip("Invert vertical control (Up/Down)")]
+        public bool invertTilt;
+
         public void ApplyTo(PtzModel model)
         {
             if (model == null) return;
@@ -40,7 +47,8 @@ namespace ViscaControlVirtualCam
             model.PanVmax = panVmax;
             model.TiltVmin = tiltVmin;
             model.TiltVmax = tiltVmax;
+            model.InvertPan = invertPan;
+            model.InvertTilt = invertTilt;
         }
     }
 }
-

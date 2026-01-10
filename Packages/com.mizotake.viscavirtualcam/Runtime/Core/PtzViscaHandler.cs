@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace ViscaControlVirtualCam
 {
@@ -14,12 +15,16 @@ namespace ViscaControlVirtualCam
         private readonly Action<string> _logger;
         private byte _focusMode = ViscaProtocol.FocusModeManual;
 
-        public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode, Action<string> logger = null)
+        private readonly int _maxPendingOperations;
+        private int _pendingOperations;
+
+        public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode, Action<string> logger = null, int maxPendingOperations = 64)
         {
             _model = model ?? throw new ArgumentNullException(nameof(model));
             _mainThreadDispatcher = mainThreadDispatcher ?? throw new ArgumentNullException(nameof(mainThreadDispatcher));
             _replyMode = replyMode;
             _logger = logger;
+            _maxPendingOperations = Math.Max(1, maxPendingOperations);
         }
 
         public bool Handle(in ViscaCommandContext ctx)
@@ -72,117 +77,86 @@ namespace ViscaControlVirtualCam
 
         private bool HandlePanTiltDrive(in ViscaCommandContext ctx)
         {
-            ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var pdir = ViscaParser.DirFromVisca(ctx.PanDirection);
-            var tdir = ViscaParser.DirFromVisca(ctx.TiltDirection);
-            var responder = ctx.Responder;
-            byte panSpeed = ctx.PanSpeed;
-            byte tiltSpeed = ctx.TiltSpeed;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () =>
             {
-                _model.CommandPanTiltVariable(panSpeed, tiltSpeed, pdir, tdir);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
+                var pdir = ViscaParser.DirFromVisca(capturedCtx.PanDirection);
+                var tdir = ViscaParser.DirFromVisca(capturedCtx.TiltDirection);
+                _model.CommandPanTiltVariable(capturedCtx.PanSpeed, capturedCtx.TiltSpeed, pdir, tdir);
+            }))
+                return true;
+
+            ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             return true;
         }
 
         private bool HandlePanTiltAbsolute(in ViscaCommandContext ctx)
         {
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandPanTiltAbsolute(capturedCtx.PanSpeed, capturedCtx.TiltSpeed, capturedCtx.PanPosition, capturedCtx.TiltPosition)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            ushort panPos = ctx.PanPosition;
-            ushort tiltPos = ctx.TiltPosition;
-            byte panSpeed = ctx.PanSpeed;
-            byte tiltSpeed = ctx.TiltSpeed;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandPanTiltAbsolute(panSpeed, tiltSpeed, panPos, tiltPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleHome(in ViscaCommandContext ctx)
         {
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandHome()))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandHome();
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandlePanTiltReset(in ViscaCommandContext ctx)
         {
+            var capturedCtx2 = ctx;
+            if (!TryEnqueue(capturedCtx2, () => _model.CommandPanTiltAbsolute(0, 0, ViscaProtocol.PositionCenter, ViscaProtocol.PositionCenter)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandPanTiltAbsolute(0, 0, ViscaProtocol.PositionCenter, ViscaProtocol.PositionCenter);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleZoomVariable(in ViscaCommandContext ctx)
         {
+            var capturedCtx3 = ctx;
+            if (!TryEnqueue(capturedCtx3, () => _model.CommandZoomVariable(capturedCtx3.ZoomSpeed)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte zoomSpeed = ctx.ZoomSpeed;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandZoomVariable(zoomSpeed);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleZoomDirect(in ViscaCommandContext ctx)
         {
+            var capturedCtx4 = ctx;
+            if (!TryEnqueue(capturedCtx4, () => _model.CommandZoomDirect(capturedCtx4.ZoomPosition)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            ushort zoomPos = ctx.ZoomPosition;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandZoomDirect(zoomPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleFocusVariable(in ViscaCommandContext ctx)
         {
+            var capturedCtx5 = ctx;
+            if (!TryEnqueue(capturedCtx5, () => _model.CommandFocusVariable(capturedCtx5.FocusSpeed)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte focusSpeed = ctx.FocusSpeed;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandFocusVariable(focusSpeed);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleFocusDirect(in ViscaCommandContext ctx)
         {
+            var capturedCtx6 = ctx;
+            if (!TryEnqueue(capturedCtx6, () => _model.CommandFocusDirect(capturedCtx6.FocusPosition)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            ushort focusPos = ctx.FocusPosition;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandFocusDirect(focusPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
@@ -206,71 +180,51 @@ namespace ViscaControlVirtualCam
 
         private bool HandleIrisVariable(in ViscaCommandContext ctx)
         {
+            var capturedCtx7 = ctx;
+            if (!TryEnqueue(capturedCtx7, () => _model.CommandIrisVariable(capturedCtx7.IrisDirection)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte irisDir = ctx.IrisDirection;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandIrisVariable(irisDir);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleIrisDirect(in ViscaCommandContext ctx)
         {
+            var capturedCtx8 = ctx;
+            if (!TryEnqueue(capturedCtx8, () => _model.CommandIrisDirect(capturedCtx8.IrisPosition)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            ushort irisPos = ctx.IrisPosition;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandIrisDirect(irisPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleMemoryRecall(in ViscaCommandContext ctx)
         {
+            var capturedCtx9 = ctx;
+            if (!TryEnqueue(capturedCtx9, () => _model.CommandMemoryRecall(capturedCtx9.MemoryNumber)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte memNum = ctx.MemoryNumber;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandMemoryRecall(memNum);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleMemorySet(in ViscaCommandContext ctx)
         {
+            var capturedCtx10 = ctx;
+            if (!TryEnqueue(capturedCtx10, () => _model.CommandMemorySet(capturedCtx10.MemoryNumber)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte memNum = ctx.MemoryNumber;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.CommandMemorySet(memNum);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
         private bool HandleMemoryReset(in ViscaCommandContext ctx)
         {
+            var capturedCtx11 = ctx;
+            if (!TryEnqueue(capturedCtx11, () => _model.DeletePreset(capturedCtx11.MemoryNumber)))
+                return true;
+
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
-            var responder = ctx.Responder;
-            byte memNum = ctx.MemoryNumber;
-            byte socketId = ctx.SocketId;
-            _mainThreadDispatcher(() =>
-            {
-                _model.DeletePreset(memNum);
-                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-            });
             return true;
         }
 
@@ -326,7 +280,52 @@ namespace ViscaControlVirtualCam
         private bool HandleCommandCancel(in ViscaCommandContext ctx)
         {
             // Immediately notify cancellation
+            if (_pendingOperations <= 0)
+            {
+                ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandNotExecutable, ctx.SocketId);
+                return true;
+            }
+
+            Interlocked.Exchange(ref _pendingOperations, 0); // best-effort clear
             ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandCancelled, ctx.SocketId);
+            return true;
+        }
+
+        private bool TryEnqueue(ViscaCommandContext ctx, Action action)
+        {
+            if (_pendingOperations >= _maxPendingOperations)
+            {
+                ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandBuffer, ctx.SocketId);
+                return false;
+            }
+
+            var responder = ctx.Responder;
+            byte socketId = ctx.SocketId;
+
+            Interlocked.Increment(ref _pendingOperations);
+            _mainThreadDispatcher(() =>
+            {
+                bool shouldComplete = true;
+                try
+                {
+                    action();
+                }
+                catch (Exception e)
+                {
+                    _logger?.Invoke($"Command execution error: {e.Message}");
+                    ViscaResponse.SendError(responder, ViscaProtocol.ErrorCommandNotExecutable, socketId);
+                    shouldComplete = false;
+                }
+                finally
+                {
+                    Interlocked.Decrement(ref _pendingOperations);
+                    if (shouldComplete)
+                    {
+                        ViscaResponse.SendCompletion(responder, _replyMode, socketId);
+                    }
+                }
+            });
+
             return true;
         }
 

@@ -43,3 +43,5 @@
 - Command Cancel: `8X 2Z FF` is a valid control command and should return `90 6z 04 FF` (CommandCanceled) using the socket from the `2Z` byte.
 - Tests: new EditMode tests live under `Packages/com.mizotake.viscavirtualcam/Tests/EditMode/` (e.g., `ViscaResponseTests.cs`) and verify socket-aware replies and cancel handling.
 - ドキュメント更新ルール: コード/テストに仕様変更・機能追加を入れた場合は、必ず対応する文書（`Packages/com.mizotake.viscavirtualcam/Documentation~/` 配下や README 類）も更新すること。
+- 実装メモ: コマンド処理キュー上限（既定64）は `ViscaServerBehaviour.pendingQueueLimit` で調整可能。ビジー時は `Buffer Full(0x03)` を返す。
+- 実装メモ: Pan/Tilt の制御向きは `PtzSettings` の `invertPan`/`invertTilt` で反転設定できる。

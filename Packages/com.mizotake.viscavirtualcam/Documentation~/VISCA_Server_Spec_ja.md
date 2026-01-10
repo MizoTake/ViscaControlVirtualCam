@@ -224,7 +224,8 @@
 - VISCA over IP ヘッダ受信時は `0x01 0x11` ヘッダで Sequence をエコーして返信する（ペイロード長 1–16 のみ）。
 - ACK/Completion/Error はソケット nibble（`Z`）を必ず反映 (`90 4Z/5Z/6Z ... FF`)。Raw VISCA 受信時の既定 `Z=1`。
 - Command Cancel (`8X 2Z FF`) に対応し、即時に `90 6Z 04 FF` を返す。ソケット番号は `2Z` バイトから抽出。
-- 構文不正/長さ超過時は Syntax(0x02) を返却。Buffer Full/Not Executable は未発生だが必要に応じて拡張可。
+- バッファ満杯時は `Buffer Full(0x03)` を返却（内部キュー上限超過時）。状態不整合や処理不能例外時は `Not Executable(0x41)` を返す。
+- 構文不正/長さ超過時は Syntax(0x02) を返却。
 
 ## Raw VISCA（Serial 互換）モード（TCP）
 - 概要

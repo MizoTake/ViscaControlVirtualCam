@@ -31,6 +31,9 @@ namespace ViscaControlVirtualCam
         public float MinFov = 15f;
         public float MaxFov = 90f;
 
+        public bool InvertPan;
+        public bool InvertTilt;
+
         public float PanMinDeg = -170f;
         public float PanMaxDeg = 170f;
         public float TiltMinDeg = -30f;
@@ -104,8 +107,13 @@ namespace ViscaControlVirtualCam
         {
             float vPan = MapSpeed(vv, PanVmin, PanVmax, PanMaxDegPerSec, SpeedGamma);
             float vTilt = MapSpeed(ww, TiltVmin, TiltVmax, TiltMaxDegPerSec, SpeedGamma);
-            _omegaPan = panDir == AxisDirection.Stop ? 0f : vPan * (panDir == AxisDirection.Positive ? 1f : -1f);
-            _omegaTilt = tiltDir == AxisDirection.Stop ? 0f : vTilt * (tiltDir == AxisDirection.Positive ? 1f : -1f);
+            float panSign = panDir == AxisDirection.Positive ? 1f : -1f;
+            float tiltSign = tiltDir == AxisDirection.Positive ? 1f : -1f;
+            if (InvertPan) panSign *= -1f;
+            if (InvertTilt) tiltSign *= -1f;
+
+            _omegaPan = panDir == AxisDirection.Stop ? 0f : vPan * panSign;
+            _omegaTilt = tiltDir == AxisDirection.Stop ? 0f : vTilt * tiltSign;
             if (panDir != AxisDirection.Stop) _targetPanDeg = null;
             if (tiltDir != AxisDirection.Stop) _targetTiltDeg = null;
         }

@@ -77,15 +77,16 @@ namespace ViscaControlVirtualCam
 
         public void Stop()
         {
-            try { _cts?.Cancel(); } catch { }
-            try { _udp?.Close(); } catch { }
-            try { _tcp?.Stop(); } catch { }
+            try { _cts?.Cancel(); } catch (Exception e) { Log($"Stop cancel error: {e.Message}"); }
+            try { _udp?.Close(); } catch (Exception e) { Log($"UDP close error: {e.Message}"); }
+            try { _tcp?.Stop(); } catch (Exception e) { Log($"TCP stop error: {e.Message}"); }
             _udp = null;
             _tcp = null;
             _cts = null;
             foreach (var kv in _clients)
             {
-                try { kv.Key.Close(); } catch { }
+                try { kv.Key.Close(); }
+                catch (Exception e) { Log($"TCP client close error: {e.Message}"); }
             }
             _clients.Clear();
             System.Threading.Interlocked.Exchange(ref _clientCount, 0);
@@ -95,7 +96,15 @@ namespace ViscaControlVirtualCam
         {
             _udp = new UdpClient(_opt.UdpPort);
             _udp.Client.ReceiveBufferSize = 64 * 1024;
-            _udp.BeginReceive(UdpReceiveCallback, null);
+            try
+            {
+                _udp.BeginReceive(UdpReceiveCallback, null);
+            }
+            catch (Exception e)
+            {
+                Log($"UDP begin receive error: {e.Message}");
+                throw;
+            }
             Log($"VISCA UDP server started on {_opt.UdpPort}");
         }
 
@@ -128,11 +137,19 @@ namespace ViscaControlVirtualCam
             {
                 // Only log if still active to avoid noise during shutdown
                 if (_udp != null) Log($"UDP receive error: {e.Message}");
-                try { _udp?.BeginReceive(UdpReceiveCallback, null); } catch { }
+                try { _udp?.BeginReceive(UdpReceiveCallback, null); }
+                catch (Exception ex)
+                {
+                    Log($"UDP begin receive error: {ex.Message}");
+                }
                 return;
             }
 
-            try { _udp?.BeginReceive(UdpReceiveCallback, null); } catch { }
+            try { _udp?.BeginReceive(UdpReceiveCallback, null); }
+            catch (Exception e)
+            {
+                Log($"UDP begin receive error: {e.Message}");
+            }
 
             Action<byte[]> send = (bytes) =>
             {
@@ -141,7 +158,10 @@ namespace ViscaControlVirtualCam
                     var u = _udp;
                     if (u != null) u.Send(bytes, bytes.Length, remote);
                 }
-                catch { }
+                catch (Exception e)
+                {
+                    Log($"UDP send error: {e.Message}");
+                }
             };
             ProcessFrame(data, send);
         }
@@ -165,8 +185,8 @@ namespace ViscaControlVirtualCam
                     }
                     client.NoDelay = true;
                     _clients[client] = new ViscaFrameFramer(_opt.MaxFrameSize);
-                    ThreadPool.QueueUserWorkItem(_ => ClientLoopTcp(client));
-                }
+            ThreadPool.QueueUserWorkItem(_ => ClientLoopTcp(client));
+        }
                 catch (SocketException)
                 {
                     if (_tcp == null) break; // shutting down
@@ -185,7 +205,18 @@ namespace ViscaControlVirtualCam
             using (var stream = client.GetStream())
             {
                 var buffer = new byte[8192];
-                Action<byte[]> send = (bytes) => { try { stream.Write(bytes, 0, bytes.Length); stream.Flush(); } catch { } };
+                Action<byte[]> send = (bytes) =>
+                {
+                    try
+                    {
+                        stream.Write(bytes, 0, bytes.Length);
+                        stream.Flush();
+                    }
+                    catch (Exception e)
+                    {
+                        Log($"TCP send error: {e.Message}");
+                    }
+                };
                 while (_cts != null && !_cts.IsCancellationRequested && client.Connected)
                 {
                     int n; try { n = stream.Read(buffer, 0, buffer.Length); } catch { break; }
@@ -341,9 +372,14 @@ namespace ViscaControlVirtualCam
         {
             return payload =>
             {
-                if (payload == null) return;
+                byte[] effectivePayload = payload;
+                if (effectivePayload == null || effectivePayload.Length == 0)
+                {
+                    effectivePayload = new byte[] { 0x90, ViscaProtocol.ResponseError, ViscaProtocol.ErrorSyntax, ViscaProtocol.FrameTerminator };
+                }
 
-                ushort length = (ushort)Math.Min(payload.Length, _opt.MaxFrameSize);
+                int maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
+                ushort length = (ushort)Math.Min(effectivePayload.Length, maxPayload);
                 byte[] packet = new byte[ViscaProtocol.ViscaIpHeaderLength + length];
                 packet[0] = ViscaProtocol.IpPayloadTypeMsbVisca;
                 packet[1] = ViscaProtocol.IpPayloadTypeLsbReply;
@@ -353,7 +389,7 @@ namespace ViscaControlVirtualCam
                 packet[5] = (byte)((envelope.Sequence >> 16) & 0xFF);
                 packet[6] = (byte)((envelope.Sequence >> 8) & 0xFF);
                 packet[7] = (byte)(envelope.Sequence & 0xFF);
-                Buffer.BlockCopy(payload, 0, packet, ViscaProtocol.ViscaIpHeaderLength, length);
+                Buffer.BlockCopy(effectivePayload, 0, packet, ViscaProtocol.ViscaIpHeaderLength, length);
                 rawSend(packet);
             };
         }

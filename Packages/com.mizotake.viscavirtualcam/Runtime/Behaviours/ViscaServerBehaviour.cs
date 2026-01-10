@@ -15,6 +15,7 @@ namespace ViscaControlVirtualCam
         public int tcpPort = 52380;
         public int maxClients = 4;
         public ViscaReplyMode replyMode = ViscaReplyMode.AckAndCompletion;
+        [Min(1)] public int pendingQueueLimit = 64;
 
         [Header("Logging")]
         [Tooltip("Enable general logging (connection events, errors, etc.)")]
@@ -64,7 +65,7 @@ namespace ViscaControlVirtualCam
                 return;
             }
 
-            var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode, msg => LogMessage(msg));
+            var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode, msg => LogMessage(msg), pendingQueueLimit);
             var opt = new ViscaServerOptions
             {
                 Transport = transport,
@@ -130,7 +131,8 @@ namespace ViscaControlVirtualCam
 
         public void StopServer()
         {
-            try { _core?.Stop(); } catch { }
+            try { _core?.Stop(); }
+            catch (Exception e) { Debug.LogError($"[VISCA] StopServer error: {e.Message}"); }
             _core = null;
         }
     }
