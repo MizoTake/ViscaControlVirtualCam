@@ -219,20 +219,22 @@ namespace ViscaControlVirtualCam
         /// <returns>Command context if handled, null if unknown command</returns>
         public ViscaCommandContext? TryExecute(byte[] frame, IViscaCommandHandler handler, Action<byte[]> responder)
         {
-            // Require at least 4 bytes for key lookup (address + category + group + subcommand)
-            if (frame == null || frame.Length < 4)
+            if (frame == null || frame.Length == 0)
                 return null;
 
-            // O(1) lookup for exact key match
-            int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
-            if (_commandsByKey.TryGetValue(key, out var entry))
+            // O(1) lookup for exact key match (only when enough bytes are present)
+            if (frame.Length >= 4)
             {
-                var contextNullable = entry.Parser(frame, responder);
-                if (contextNullable.HasValue)
+                int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+                if (_commandsByKey.TryGetValue(key, out var entry))
                 {
-                    var context = contextNullable.Value;
-                    handler.Handle(in context);
-                    return contextNullable;
+                    var contextNullable = entry.Parser(frame, responder);
+                    if (contextNullable.HasValue)
+                    {
+                        var context = contextNullable.Value;
+                        handler.Handle(in context);
+                        return contextNullable;
+                    }
                 }
             }
 

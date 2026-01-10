@@ -11,6 +11,9 @@ namespace ViscaControlVirtualCam
 
         [Header("Settings Preset")] public PtzSettings settings;
 
+        [Header("Tuning (Optional)")]
+        public PtzTuningProfile tuningProfile;
+
         [Header("Memory Presets")]
         [Tooltip("Enable persistent memory presets using PlayerPrefs")]
         public bool enablePersistentMemory = true;
@@ -82,6 +85,11 @@ namespace ViscaControlVirtualCam
             if (settings != null)
             {
                 settings.ApplyTo(_model);
+            }
+
+            if (tuningProfile != null)
+            {
+                tuningProfile.ApplyTo(_model);
             }
         }
 

@@ -28,6 +28,12 @@ namespace ViscaControlVirtualCam
         [Tooltip("Invert vertical control (Up/Down)")]
         public bool invertTilt;
 
+        [Tooltip("Invert Pan absolute position mapping (Lerp is flipped)")]
+        public bool invertPanAbsolute;
+
+        [Tooltip("Invert Tilt absolute position mapping (Lerp is flipped)")]
+        public bool invertTiltAbsolute;
+
         public void ApplyTo(PtzModel model)
         {
             if (model == null) return;
@@ -49,6 +55,8 @@ namespace ViscaControlVirtualCam
             model.TiltVmax = tiltVmax;
             model.InvertPan = invertPan;
             model.InvertTilt = invertTilt;
+            model.InvertPanAbsolute = invertPanAbsolute;
+            model.InvertTiltAbsolute = invertTiltAbsolute;
         }
     }
 }

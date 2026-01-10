@@ -46,3 +46,4 @@
 - 実装メモ: コマンド処理キュー上限（既定64）は `ViscaServerBehaviour.pendingQueueLimit` で調整可能。ビジー時は `Buffer Full(0x03)` を返す。
 - 実装メモ: Pan/Tilt の制御向きは `PtzSettings` の `invertPan`/`invertTilt` で反転設定できる。
 - 参照ドキュメント: ソニー FR7 VISCA over IP 仕様書（ILME-FR7_OH_5042055031） https://www.sony.jp/professional/support/manual_pdf/c_c/ILME-FR7_OH_5042055031.pdf （必要に応じて確認すること）。
+- 追加設定: PtzSettings で絶対位置反転（invertPanAbsolute/invertTiltAbsolute）を選択可能。PtzTuningProfile で加速度上限を設定し実機寄りの挙動を試せる。

@@ -52,7 +52,8 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 ### 2. 設定
 - **ViscaServerBehaviour**: ネットワーク設定（UDP/TCPポート、ログ）
 - **PtzControllerBehaviour**: メモリの永続化、カメラの可動範囲
-- **PtzSettings**: 速度カーブ、移動の減衰、FOV範囲、Pan/Tilt反転オプション
+- **PtzSettings**: 速度カーブ、移動の減衰、FOV範囲、Pan/Tilt反転（速度/絶対位置別）
+- **PtzTuningProfile（任意）**: 物理機っぽい減速・加速度上限を設定可能（Pan/Tilt/Zoomの加速度制限）
 - **Pending Queue Limit**: ViscaServerBehaviourでキュー上限（既定64）を調整し、ビジー時は `Buffer Full(0x03)` を返す挙動を設定可能
 
 ### 3. 実行
@@ -138,4 +139,3 @@ Register(new MyCommand());
 
 - Unity 2020.3 以降
 - .NET Standard 2.1
-

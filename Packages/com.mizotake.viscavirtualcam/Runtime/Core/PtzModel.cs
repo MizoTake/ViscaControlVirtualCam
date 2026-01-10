@@ -33,6 +33,13 @@ namespace ViscaControlVirtualCam
 
         public bool InvertPan;
         public bool InvertTilt;
+        public bool InvertPanAbsolute;
+        public bool InvertTiltAbsolute;
+
+        public bool UseAccelerationLimit;
+        public float PanAccelDegPerSec2 = 600f;
+        public float TiltAccelDegPerSec2 = 600f;
+        public float ZoomAccelDegPerSec2 = 300f;
 
         public float PanMinDeg = -170f;
         public float PanMaxDeg = 170f;
@@ -57,6 +64,11 @@ namespace ViscaControlVirtualCam
         private float _omegaFov;  // +increase FOV, deg/s
         private float _omegaFocus; // +far, units/s
         private float _omegaIris;  // +open, units/s
+
+        // Acceleration-limited velocities (optional)
+        private float _omegaPanCurrent;
+        private float _omegaTiltCurrent;
+        private float _omegaFovCurrent;
 
         private float? _targetPanDeg;  // absolute target yaw
         private float? _targetTiltDeg; // absolute target pitch
@@ -141,8 +153,13 @@ namespace ViscaControlVirtualCam
 
         public void CommandPanTiltAbsolute(byte vv, byte ww, ushort panPos, ushort tiltPos)
         {
-            float panDeg = Lerp(PanMinDeg, PanMaxDeg, panPos / 65535f);
-            float tiltDeg = Lerp(TiltMinDeg, TiltMaxDeg, tiltPos / 65535f);
+            float panNorm = panPos / 65535f;
+            float tiltNorm = tiltPos / 65535f;
+            if (InvertPanAbsolute) panNorm = 1f - panNorm;
+            if (InvertTiltAbsolute) tiltNorm = 1f - tiltNorm;
+
+            float panDeg = Lerp(PanMinDeg, PanMaxDeg, panNorm);
+            float tiltDeg = Lerp(TiltMinDeg, TiltMaxDeg, tiltNorm);
             _targetPanDeg = panDeg;
             _targetTiltDeg = tiltDeg;
             _omegaPan = 0f;
@@ -365,8 +382,23 @@ namespace ViscaControlVirtualCam
             var result = new PtzStepResult();
 
             // Velocity drive
-            result.DeltaYawDeg += _omegaPan * dt;
-            result.DeltaPitchDeg += _omegaTilt * dt;
+            float panVel = _omegaPan;
+            float tiltVel = _omegaTilt;
+            float fovVel = _omegaFov;
+
+            if (UseAccelerationLimit)
+            {
+                panVel = MoveTowards(_omegaPanCurrent, _omegaPan, PanAccelDegPerSec2 * dt);
+                tiltVel = MoveTowards(_omegaTiltCurrent, _omegaTilt, TiltAccelDegPerSec2 * dt);
+                fovVel = MoveTowards(_omegaFovCurrent, _omegaFov, ZoomAccelDegPerSec2 * dt);
+
+                _omegaPanCurrent = panVel;
+                _omegaTiltCurrent = tiltVel;
+                _omegaFovCurrent = fovVel;
+            }
+
+            result.DeltaYawDeg += panVel * dt;
+            result.DeltaPitchDeg += tiltVel * dt;
 
             // Absolute with damping
             if (_targetPanDeg.HasValue)
@@ -388,7 +420,7 @@ namespace ViscaControlVirtualCam
             }
 
             // Zoom
-            float newFov = currentFovDeg + _omegaFov * dt;
+            float newFov = currentFovDeg + fovVel * dt;
             if (_targetFov.HasValue)
             {
                 float targetFov = Clamp(_targetFov.Value, MinFov, MaxFov);
@@ -459,6 +491,12 @@ namespace ViscaControlVirtualCam
             if (diff > 180f) diff -= 360f;
             if (diff < -180f) diff += 360f;
             return diff;
+        }
+
+        private static float MoveTowards(float current, float target, float maxDelta)
+        {
+            if (Math.Abs(target - current) <= maxDelta) return target;
+            return current + Math.Sign(target - current) * maxDelta;
         }
     }
 }
