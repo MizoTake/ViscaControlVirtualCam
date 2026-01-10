@@ -78,10 +78,11 @@ namespace ViscaControlVirtualCam
             var responder = ctx.Responder;
             byte panSpeed = ctx.PanSpeed;
             byte tiltSpeed = ctx.TiltSpeed;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandPanTiltVariable(panSpeed, tiltSpeed, pdir, tdir);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -94,10 +95,11 @@ namespace ViscaControlVirtualCam
             ushort tiltPos = ctx.TiltPosition;
             byte panSpeed = ctx.PanSpeed;
             byte tiltSpeed = ctx.TiltSpeed;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandPanTiltAbsolute(panSpeed, tiltSpeed, panPos, tiltPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -106,10 +108,11 @@ namespace ViscaControlVirtualCam
         {
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandHome();
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -118,10 +121,11 @@ namespace ViscaControlVirtualCam
         {
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandPanTiltAbsolute(0, 0, ViscaProtocol.PositionCenter, ViscaProtocol.PositionCenter);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -131,10 +135,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             byte zoomSpeed = ctx.ZoomSpeed;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandZoomVariable(zoomSpeed);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -144,10 +149,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             ushort zoomPos = ctx.ZoomPosition;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandZoomDirect(zoomPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -157,10 +163,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             byte focusSpeed = ctx.FocusSpeed;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandFocusVariable(focusSpeed);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -170,10 +177,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             ushort focusPos = ctx.FocusPosition;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandFocusDirect(focusPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -201,10 +209,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             byte irisDir = ctx.IrisDirection;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandIrisVariable(irisDir);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -214,10 +223,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             ushort irisPos = ctx.IrisPosition;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandIrisDirect(irisPos);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -227,10 +237,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             byte memNum = ctx.MemoryNumber;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandMemoryRecall(memNum);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -240,10 +251,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             byte memNum = ctx.MemoryNumber;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.CommandMemorySet(memNum);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }
@@ -253,10 +265,11 @@ namespace ViscaControlVirtualCam
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             var responder = ctx.Responder;
             byte memNum = ctx.MemoryNumber;
+            byte socketId = ctx.SocketId;
             _mainThreadDispatcher(() =>
             {
                 _model.DeletePreset(memNum);
-                ViscaResponse.SendCompletion(responder, _replyMode, ctx.SocketId);
+                ViscaResponse.SendCompletion(responder, _replyMode, socketId);
             });
             return true;
         }

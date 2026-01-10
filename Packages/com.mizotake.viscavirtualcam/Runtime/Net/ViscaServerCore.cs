@@ -192,7 +192,6 @@ namespace ViscaControlVirtualCam
                     if (n <= 0) break;
                     if (_clients.TryGetValue(client, out var framer))
                     {
-                        int before = 0;
                         framer.Append(new ReadOnlySpan<byte>(buffer, 0, n), frame =>
                         {
                             if (frame.Length > _opt.MaxFrameSize)
@@ -222,7 +221,7 @@ namespace ViscaControlVirtualCam
 
             if (TryParseViscaIpEnvelope(packet, out var envelope, out var payload, out var headerError))
             {
-                responder = WrapResponderWithViscaIpHeader(rawSend, in envelope);
+                responder = WrapResponderWithViscaIpHeader(rawSend, envelope);
                 frame = payload;
 
                 if (!string.IsNullOrEmpty(headerError))
@@ -338,7 +337,7 @@ namespace ViscaControlVirtualCam
             return true;
         }
 
-        private Action<byte[]> WrapResponderWithViscaIpHeader(Action<byte[]> rawSend, in ViscaIpEnvelope envelope)
+        private Action<byte[]> WrapResponderWithViscaIpHeader(Action<byte[]> rawSend, ViscaIpEnvelope envelope)
         {
             return payload =>
             {
