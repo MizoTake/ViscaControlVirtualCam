@@ -1,10 +1,10 @@
 // Editor-only utility to generate a simple PTZ sample scene
+
 #if UNITY_EDITOR
 using System.IO;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
-using UnityEngine.SceneManagement;
 
 namespace ViscaControlVirtualCam.Editor
 {
@@ -48,7 +48,10 @@ namespace ViscaControlVirtualCam.Editor
             PtzPresetCreator.CreatePresets();
             var defaultPath = "Assets/ViscaControlVirtualCamera/Presets/PTZ_Outdoor.asset";
             var defaultSettings = AssetDatabase.LoadAssetAtPath<PtzSettings>(defaultPath);
-            controller.settings = defaultSettings != null ? defaultSettings : AssetDatabase.LoadAssetAtPath<PtzSettings>("Assets/ViscaControlVirtualCamera/Presets/PTZ_Indoor.asset");
+            controller.settings = defaultSettings != null
+                ? defaultSettings
+                : AssetDatabase.LoadAssetAtPath<PtzSettings>(
+                    "Assets/ViscaControlVirtualCamera/Presets/PTZ_Indoor.asset");
 
             // Add server behaviour object
             var serverGo = new GameObject("VISCA Server");
@@ -67,7 +70,9 @@ namespace ViscaControlVirtualCam.Editor
             EditorSceneManager.MarkSceneDirty(scene);
             EditorSceneManager.SaveScene(scene, ScenePath, true);
             AssetDatabase.Refresh();
-            EditorUtility.DisplayDialog("PTZ Sample", $"Sample scene created:\n{ScenePath}\n\nRun play mode and send VISCA commands to UDP {server.udpPort}.", "OK");
+            EditorUtility.DisplayDialog("PTZ Sample",
+                $"Sample scene created:\n{ScenePath}\n\nRun play mode and send VISCA commands to UDP {server.udpPort}.",
+                "OK");
         }
     }
 }

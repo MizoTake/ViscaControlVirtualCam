@@ -8,8 +8,8 @@ namespace ViscaControlVirtualCam
     [DefaultExecutionOrder(-50)]
     public class ViscaServerBehaviour : MonoBehaviour
     {
-        [Header("Server")]
-        public bool autoStart = true;
+        [Header("Server")] public bool autoStart = true;
+
         public ViscaTransport transport = ViscaTransport.UdpRawVisca;
         public int udpPort = 52381;
         public int tcpPort = 52380;
@@ -17,8 +17,7 @@ namespace ViscaControlVirtualCam
         public ViscaReplyMode replyMode = ViscaReplyMode.AckAndCompletion;
         [Min(1)] public int pendingQueueLimit = 64;
 
-        [Header("Logging")]
-        [Tooltip("Enable general logging (connection events, errors, etc.)")]
+        [Header("Logging")] [Tooltip("Enable general logging (connection events, errors, etc.)")]
         public bool verboseLog = true;
 
         [Tooltip("Log every received VISCA command with detailed information")]
@@ -27,8 +26,7 @@ namespace ViscaControlVirtualCam
         [Tooltip("Log level for filtering messages")]
         public ViscaLogLevel logLevel = ViscaLogLevel.Commands;
 
-        [Header("Targets")]
-        public PtzControllerBehaviour ptzController;
+        [Header("Targets")] public PtzControllerBehaviour ptzController;
 
         private readonly ConcurrentQueue<Action> _mainThreadActions = new();
         private ViscaServerCore _core;
@@ -46,9 +44,14 @@ namespace ViscaControlVirtualCam
         private void Update()
         {
             while (_mainThreadActions.TryDequeue(out var act))
-            {
-                try { act(); } catch (Exception e) { Debug.LogException(e); }
-            }
+                try
+                {
+                    act();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogException(e);
+                }
         }
 
         private void OnDestroy()
@@ -65,7 +68,8 @@ namespace ViscaControlVirtualCam
                 return;
             }
 
-            var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode, msg => LogMessage(msg), pendingQueueLimit);
+            var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode,
+                msg => LogMessage(msg), pendingQueueLimit);
             var opt = new ViscaServerOptions
             {
                 Transport = transport,
@@ -85,14 +89,15 @@ namespace ViscaControlVirtualCam
             if (!verboseLog) return;
 
             // Determine message type from content
-            ViscaLogLevel messageLevel = ViscaLogLevel.Info;
+            var messageLevel = ViscaLogLevel.Info;
 
-            bool ContainsCI(string s, string needle) => s?.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
+            bool ContainsCI(string s, string needle)
+            {
+                return s?.IndexOf(needle, StringComparison.OrdinalIgnoreCase) >= 0;
+            }
 
             if (message.StartsWith("RX:"))
-            {
                 messageLevel = ViscaLogLevel.Commands;
-            }
             // Explicitly classify known error patterns emitted by ViscaServerCore
             else if (
                 ContainsCI(message, "invalid visca frame") ||
@@ -101,21 +106,13 @@ namespace ViscaControlVirtualCam
                 ContainsCI(message, "receive error") ||
                 ContainsCI(message, " error:") || // generic error phrasing
                 ContainsCI(message, "exception"))
-            {
                 messageLevel = ViscaLogLevel.Errors;
-            }
             else if (ContainsCI(message, "warning"))
-            {
                 messageLevel = ViscaLogLevel.Warnings;
-            }
             else if (ContainsCI(message, "started") || ContainsCI(message, "stopped"))
-            {
                 messageLevel = ViscaLogLevel.Info;
-            }
             else
-            {
                 messageLevel = ViscaLogLevel.Debug;
-            }
 
             // Filter based on log level
             if ((int)messageLevel > (int)logLevel) return;
@@ -131,8 +128,15 @@ namespace ViscaControlVirtualCam
 
         public void StopServer()
         {
-            try { _core?.Stop(); }
-            catch (Exception e) { Debug.LogError($"[VISCA] StopServer error: {e.Message}"); }
+            try
+            {
+                _core?.Stop();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[VISCA] StopServer error: {e.Message}");
+            }
+
             _core = null;
         }
     }

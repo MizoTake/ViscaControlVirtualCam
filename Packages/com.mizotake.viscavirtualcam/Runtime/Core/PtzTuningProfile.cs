@@ -3,7 +3,7 @@ using UnityEngine;
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// Optional tuning profile to approximate physical PTZ behavior.
+    ///     Optional tuning profile to approximate physical PTZ behavior.
     /// </summary>
     [CreateAssetMenu(fileName = "PTZ_Tuning", menuName = "Visca/PTZ Tuning Profile", order = 11)]
     public class PtzTuningProfile : ScriptableObject

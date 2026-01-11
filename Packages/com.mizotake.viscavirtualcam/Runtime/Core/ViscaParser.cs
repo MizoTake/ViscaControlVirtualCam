@@ -1,13 +1,10 @@
-using System;
-
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// VISCA utility functions for nibble decoding and axis direction conversion
+    ///     VISCA utility functions for nibble decoding and axis direction conversion
     /// </summary>
     public static class ViscaParser
     {
-
         public static ushort DecodeNibble16(byte n1, byte n2, byte n3, byte n4)
         {
             ushort v = 0;

@@ -7,15 +7,15 @@ namespace ViscaControlVirtualCam.Editor
     public class ViscaServerBehaviourEditor : UnityEditor.Editor
     {
         private SerializedProperty autoStart;
+        private SerializedProperty logLevel;
+        private SerializedProperty logReceivedCommands;
+        private SerializedProperty maxClients;
+        private SerializedProperty ptzController;
+        private SerializedProperty replyMode;
+        private SerializedProperty tcpPort;
         private SerializedProperty transport;
         private SerializedProperty udpPort;
-        private SerializedProperty tcpPort;
-        private SerializedProperty maxClients;
-        private SerializedProperty replyMode;
         private SerializedProperty verboseLog;
-        private SerializedProperty logReceivedCommands;
-        private SerializedProperty logLevel;
-        private SerializedProperty ptzController;
 
         private void OnEnable()
         {
@@ -58,7 +58,8 @@ namespace ViscaControlVirtualCam.Editor
                 EditorGUILayout.PropertyField(logLevel);
 
                 // Help box explaining log levels
-                EditorGUILayout.HelpBox(GetLogLevelDescription((ViscaLogLevel)logLevel.enumValueIndex), MessageType.Info);
+                EditorGUILayout.HelpBox(GetLogLevelDescription((ViscaLogLevel)logLevel.enumValueIndex),
+                    MessageType.Info);
                 EditorGUI.indentLevel--;
             }
 
@@ -74,17 +75,11 @@ namespace ViscaControlVirtualCam.Editor
             if (Application.isPlaying)
             {
                 EditorGUILayout.LabelField("Runtime Controls", EditorStyles.boldLabel);
-                ViscaServerBehaviour server = (ViscaServerBehaviour)target;
+                var server = (ViscaServerBehaviour)target;
 
                 EditorGUILayout.BeginHorizontal();
-                if (GUILayout.Button("Start Server"))
-                {
-                    server.StartServer();
-                }
-                if (GUILayout.Button("Stop Server"))
-                {
-                    server.StopServer();
-                }
+                if (GUILayout.Button("Start Server")) server.StartServer();
+                if (GUILayout.Button("Stop Server")) server.StopServer();
                 EditorGUILayout.EndHorizontal();
 
                 // Runtime log level adjustment

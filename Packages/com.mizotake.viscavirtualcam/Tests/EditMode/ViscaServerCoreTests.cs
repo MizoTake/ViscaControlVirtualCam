@@ -19,7 +19,7 @@ public class ViscaServerCoreTests
         var sent = new List<byte[]>();
 
         // Declared payload length exceeds VISCA spec (0x14 > 0x10)
-        byte[] packet = BuildViscaIpPacket(0x01, 0x00, 0x0014, 0x00000009, new byte[20]);
+        var packet = BuildViscaIpPacket(0x01, 0x00, 0x0014, 0x00000009, new byte[20]);
         InvokeProcessFrame(server, packet, sent);
         server.Dispose();
 
@@ -48,7 +48,7 @@ public class ViscaServerCoreTests
         var sent = new List<byte[]>();
 
         byte[] payload = { 0x85, 0x00, 0xFF }; // dummy control payload, socket nibble = 5
-        byte[] packet = BuildViscaIpPacket(0x02, 0x00, (ushort)payload.Length, 0xABCDEF01u, payload);
+        var packet = BuildViscaIpPacket(0x02, 0x00, (ushort)payload.Length, 0xABCDEF01u, payload);
         InvokeProcessFrame(server, packet, sent);
         server.Dispose();
 
@@ -75,19 +75,21 @@ public class ViscaServerCoreTests
 
         // Missing terminator
         byte[] payload = { 0x82, 0x00 };
-        byte[] packet = BuildViscaIpPacket(0x02, 0x00, (ushort)payload.Length, 0x00000002u, payload);
+        var packet = BuildViscaIpPacket(0x02, 0x00, (ushort)payload.Length, 0x00000002u, payload);
         InvokeProcessFrame(server, packet, sent);
         server.Dispose();
 
         Assert.AreEqual(1, sent.Count, "Should respond once");
         var resp = sent[0];
-        CollectionAssert.AreEqual(new byte[] { 0x01, 0x11, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02 }, resp.Take(8).ToArray());
+        CollectionAssert.AreEqual(new byte[] { 0x01, 0x11, 0x00, 0x04, 0x00, 0x00, 0x00, 0x02 },
+            resp.Take(8).ToArray());
         CollectionAssert.AreEqual(new byte[] { 0x90, 0x62, 0x02, 0xFF }, resp.Skip(8).ToArray());
     }
 
-    private static byte[] BuildViscaIpPacket(byte typeMsb, byte typeLsb, ushort payloadLength, uint sequence, byte[] payload)
+    private static byte[] BuildViscaIpPacket(byte typeMsb, byte typeLsb, ushort payloadLength, uint sequence,
+        byte[] payload)
     {
-        byte[] packet = new byte[ViscaProtocol.ViscaIpHeaderLength + payload.Length];
+        var packet = new byte[ViscaProtocol.ViscaIpHeaderLength + payload.Length];
         packet[0] = typeMsb;
         packet[1] = typeLsb;
         packet[2] = (byte)((payloadLength >> 8) & 0xFF);

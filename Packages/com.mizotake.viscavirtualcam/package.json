@@ -6,7 +6,13 @@
   "type": "library",
   "hideInEditor": false,
   "description": "Minimal VISCA-compatible PTZ virtual camera server for Unity. UDP/TCP Raw VISCA, PT drive, zoom, absolute PT, with pure C# core and thin behaviours.",
-  "keywords": ["VISCA", "PTZ", "camera", "UDP", "TCP"],
+  "keywords": [
+    "VISCA",
+    "PTZ",
+    "camera",
+    "UDP",
+    "TCP"
+  ],
   "category": "Cameras",
   "author": {
     "name": "com.mizotake.viscavirtualcam"

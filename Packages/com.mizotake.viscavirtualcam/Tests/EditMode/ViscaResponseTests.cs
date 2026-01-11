@@ -48,7 +48,7 @@ public class ViscaResponseTests
     [Test]
     public void ExtractSocketId_DefaultsWhenZero()
     {
-        byte id = ViscaProtocol.ExtractSocketId(new byte[] { 0x80, 0x01, 0x06, 0x01, 0x00, 0xFF });
+        var id = ViscaProtocol.ExtractSocketId(new byte[] { 0x80, 0x01, 0x06, 0x01, 0x00, 0xFF });
 
         Assert.AreEqual(ViscaProtocol.DefaultSocketId, id);
     }
@@ -56,7 +56,7 @@ public class ViscaResponseTests
     [Test]
     public void ExtractSocketId_CommandCancel_UsesSecondByte()
     {
-        byte id = ViscaProtocol.ExtractSocketId(new byte[] { 0x81, 0x25, 0xFF });
+        var id = ViscaProtocol.ExtractSocketId(new byte[] { 0x81, 0x25, 0xFF });
 
         Assert.AreEqual(0x05, id);
     }
@@ -97,9 +97,7 @@ public class ViscaResponseTests
         {
             LastContext = context;
             if (context.CommandType == ViscaCommandType.CommandCancel)
-            {
                 ViscaResponse.SendError(context.Responder, ViscaProtocol.ErrorCommandCancelled, context.SocketId);
-            }
             return true;
         }
 

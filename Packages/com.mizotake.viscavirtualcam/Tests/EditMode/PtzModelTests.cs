@@ -1,19 +1,37 @@
+using System.Collections.Generic;
 using NUnit.Framework;
 using ViscaControlVirtualCam;
-using System.Collections.Generic;
 
 /// <summary>
-/// Mock PlayerPrefs adapter for testing
+///     Mock PlayerPrefs adapter for testing
 /// </summary>
 public class MockPlayerPrefsAdapter : IPlayerPrefsAdapter
 {
-    private readonly Dictionary<string, float> _data = new Dictionary<string, float>();
+    private readonly Dictionary<string, float> _data = new();
 
-    public void SetFloat(string key, float value) => _data[key] = value;
-    public float GetFloat(string key, float defaultValue) => _data.TryGetValue(key, out var v) ? v : defaultValue;
-    public bool HasKey(string key) => _data.ContainsKey(key);
-    public void DeleteKey(string key) => _data.Remove(key);
-    public void Save() { }
+    public void SetFloat(string key, float value)
+    {
+        _data[key] = value;
+    }
+
+    public float GetFloat(string key, float defaultValue)
+    {
+        return _data.TryGetValue(key, out var v) ? v : defaultValue;
+    }
+
+    public bool HasKey(string key)
+    {
+        return _data.ContainsKey(key);
+    }
+
+    public void DeleteKey(string key)
+    {
+        _data.Remove(key);
+    }
+
+    public void Save()
+    {
+    }
 }
 
 public class PtzModelTests
@@ -49,15 +67,19 @@ public class PtzModelTests
     [Test]
     public void Absolute_Move_ReachesTarget()
     {
-        var m = new PtzModel { PanMinDeg = -170, PanMaxDeg = 170, TiltMinDeg = -30, TiltMaxDeg = 90, MoveDamping = 100f };
+        var m = new PtzModel
+            { PanMinDeg = -170, PanMaxDeg = 170, TiltMinDeg = -30, TiltMaxDeg = 90, MoveDamping = 100f };
         m.CommandPanTiltAbsolute(0x10, 0x10, 0x8000, 0x8000); // center: pan=0, tilt=30
-        var yaw = -45f; var pitch = -10f; var fov = 60f;
-        for (int i = 0; i < 20; i++)
+        var yaw = -45f;
+        var pitch = -10f;
+        var fov = 60f;
+        for (var i = 0; i < 20; i++)
         {
             var s = m.Step(yaw, pitch, fov, 0.05f);
             yaw += s.DeltaYawDeg;
             pitch += s.DeltaPitchDeg;
         }
+
         // Target: pan=0deg (center of -170 to 170), tilt=30deg (center of -30 to 90)
         Assert.That(yaw, Is.InRange(-1.0f, 1.0f), "Pan should reach 0 degrees");
         Assert.That(pitch, Is.InRange(29.0f, 31.0f), "Tilt should reach 30 degrees");
@@ -100,7 +122,7 @@ public class PtzModelTests
 
         // Step to reach target
         float yaw = 50f, pitch = 60f, fov = 70f;
-        for (int i = 0; i < 50; i++)
+        for (var i = 0; i < 50; i++)
         {
             var s = m.Step(yaw, pitch, fov, 0.05f);
             yaw += s.DeltaYawDeg;
@@ -130,7 +152,7 @@ public class PtzModelTests
 
         // Verify preset was loaded
         float yaw = 0f, pitch = 0f, fov = 60f;
-        for (int i = 0; i < 50; i++)
+        for (var i = 0; i < 50; i++)
         {
             var s = m2.Step(yaw, pitch, fov, 0.05f);
             yaw += s.DeltaYawDeg;

@@ -1,7 +1,7 @@
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// PlayerPrefs adapter interface for dependency injection
+    ///     PlayerPrefs adapter interface for dependency injection
     /// </summary>
     public interface IPlayerPrefsAdapter
     {

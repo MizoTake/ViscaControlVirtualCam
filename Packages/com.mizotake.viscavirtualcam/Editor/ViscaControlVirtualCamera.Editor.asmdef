@@ -1,19 +1,19 @@
 ﻿{
-    "name": "com.mizotake.viscavirtualcam.editor",
-    "rootNamespace": "ViscaControlVirtualCam.Editor",
-    "references": [
-        "com.mizotake.viscavirtualcam.runtime"
-    ],
-    "includePlatforms": [
-        "Editor"
-    ],
-    "excludePlatforms": [],
-    "allowUnsafeCode": false,
-    "overrideReferences": false,
-    "precompiledReferences": [],
-    "autoReferenced": true,
-    "defineConstraints": [],
-    "versionDefines": [],
-    "noEngineReferences": false
+  "name": "com.mizotake.viscavirtualcam.editor",
+  "rootNamespace": "ViscaControlVirtualCam.Editor",
+  "references": [
+    "com.mizotake.viscavirtualcam.runtime"
+  ],
+  "includePlatforms": [
+    "Editor"
+  ],
+  "excludePlatforms": [],
+  "allowUnsafeCode": false,
+  "overrideReferences": false,
+  "precompiledReferences": [],
+  "autoReferenced": true,
+  "defineConstraints": [],
+  "versionDefines": [],
+  "noEngineReferences": false
 }
 

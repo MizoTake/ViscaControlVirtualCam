@@ -16,7 +16,6 @@ namespace ViscaControlVirtualCam.Editor
             using (new EditorGUILayout.HorizontalScope())
             {
                 if (GUILayout.Button("Apply Settings Now"))
-                {
                     foreach (var t in targets)
                     {
                         var c = t as PtzControllerBehaviour;
@@ -27,10 +26,8 @@ namespace ViscaControlVirtualCam.Editor
                             EditorUtility.SetDirty(c);
                         }
                     }
-                }
             }
         }
     }
 }
 #endif
-

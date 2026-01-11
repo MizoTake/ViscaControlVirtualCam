@@ -1,6 +1,5 @@
 using NUnit.Framework;
 using ViscaControlVirtualCam;
-using System;
 
 public class ViscaParserTests
 {
@@ -15,7 +14,7 @@ public class ViscaParserTests
     [Test]
     public void DecodeNibble16_Works()
     {
-        ushort v = ViscaParser.DecodeNibble16(0x00, 0x08, 0x00, 0x00);
+        var v = ViscaParser.DecodeNibble16(0x00, 0x08, 0x00, 0x00);
         Assert.AreEqual(0x0800, v);
     }
 
@@ -46,8 +45,8 @@ public class ViscaParserTests
         var frame = new byte[] { 0x81, 0x01, 0x06, 0x02, 0x00, 0x08, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0xFF };
         Assert.AreEqual("PanTiltAbsolute", _registry.GetCommandName(frame));
         // Decode the values using ViscaParser (positions start at index 4 for speedless format)
-        ushort pan = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
-        ushort tilt = ViscaParser.DecodeNibble16(frame[8], frame[9], frame[10], frame[11]);
+        var pan = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+        var tilt = ViscaParser.DecodeNibble16(frame[8], frame[9], frame[10], frame[11]);
         Assert.AreEqual(0x0800, pan);
         Assert.AreEqual(0x0800, tilt);
     }
@@ -58,7 +57,7 @@ public class ViscaParserTests
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x47, 0x0A, 0x0B, 0x0C, 0x0D, 0xFF };
         Assert.AreEqual("ZoomDirect", _registry.GetCommandName(frame));
-        ushort zoomPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+        var zoomPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
         Assert.AreEqual(0xABCD, zoomPos);
     }
 
@@ -83,7 +82,7 @@ public class ViscaParserTests
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x48, 0x01, 0x02, 0x03, 0x04, 0xFF };
         Assert.AreEqual("FocusDirect", _registry.GetCommandName(frame));
-        ushort focusPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+        var focusPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
         Assert.AreEqual(0x1234, focusPos);
     }
 
@@ -108,7 +107,7 @@ public class ViscaParserTests
     {
         var frame = new byte[] { 0x81, 0x01, 0x04, 0x4B, 0x05, 0x06, 0x07, 0x08, 0xFF };
         Assert.AreEqual("IrisDirect", _registry.GetCommandName(frame));
-        ushort irisPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+        var irisPos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
         Assert.AreEqual(0x5678, irisPos);
     }
 
@@ -131,12 +130,16 @@ public class ViscaParserTests
     [Test]
     public void GetCommandName_Blackmagic_Commands()
     {
-        Assert.AreEqual("ZoomDirect", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x47, 0x00, 0x00, 0x00, 0x00, 0xFF }));
+        Assert.AreEqual("ZoomDirect",
+            _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x47, 0x00, 0x00, 0x00, 0x00, 0xFF }));
         Assert.AreEqual("FocusVariable", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x08, 0x02, 0xFF }));
-        Assert.AreEqual("FocusDirect", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x48, 0x00, 0x00, 0x00, 0x00, 0xFF }));
+        Assert.AreEqual("FocusDirect",
+            _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x48, 0x00, 0x00, 0x00, 0x00, 0xFF }));
         Assert.AreEqual("IrisVariable", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x0B, 0x02, 0xFF }));
-        Assert.AreEqual("IrisDirect", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x4B, 0x00, 0x00, 0x00, 0x00, 0xFF }));
-        Assert.AreEqual("MemoryRecall", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF }));
+        Assert.AreEqual("IrisDirect",
+            _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x4B, 0x00, 0x00, 0x00, 0x00, 0xFF }));
+        Assert.AreEqual("MemoryRecall",
+            _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF }));
         Assert.AreEqual("MemorySet", _registry.GetCommandName(new byte[] { 0x81, 0x01, 0x04, 0x3F, 0x01, 0x00, 0xFF }));
     }
 

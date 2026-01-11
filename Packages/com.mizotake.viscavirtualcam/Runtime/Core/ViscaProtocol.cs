@@ -1,8 +1,8 @@
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// VISCA protocol constants and specifications.
-    /// Reference: Sony VISCA Protocol Manual
+    ///     VISCA protocol constants and specifications.
+    ///     Reference: Sony VISCA Protocol Manual
     /// </summary>
     public static class ViscaProtocol
     {
@@ -92,13 +92,13 @@ namespace ViscaControlVirtualCam
 
         // Math constants
         /// <summary>
-        /// Epsilon for safe floating-point division (avoid NaN/Infinity).
+        ///     Epsilon for safe floating-point division (avoid NaN/Infinity).
         /// </summary>
         public const float DivisionEpsilon = 0.001f;
 
         /// <summary>
-        /// Extract socket id from VISCA payload (lower nibble of first byte).
-        /// Falls back to DefaultSocketId when unavailable or zero.
+        ///     Extract socket id from VISCA payload (lower nibble of first byte).
+        ///     Falls back to DefaultSocketId when unavailable or zero.
         /// </summary>
         public static byte ExtractSocketId(byte[] frame)
         {
@@ -108,24 +108,24 @@ namespace ViscaControlVirtualCam
             // Command Cancel encodes socket in byte[1] low nibble (format: 8X 2Z FF)
             if (frame.Length >= 2 && (frame[1] & 0xF0) == 0x20)
             {
-                byte cancelSocket = (byte)(frame[1] & 0x0F);
+                var cancelSocket = (byte)(frame[1] & 0x0F);
                 if (cancelSocket != 0) return cancelSocket;
             }
 
-            byte socket = (byte)(frame[0] & 0x0F);
+            var socket = (byte)(frame[0] & 0x0F);
             return socket == 0 ? DefaultSocketId : socket;
         }
     }
 
     /// <summary>
-    /// Command identifiers for fast lookup.
-    /// Combines distinguishing bytes into a single value.
+    ///     Command identifiers for fast lookup.
+    ///     Combines distinguishing bytes into a single value.
     /// </summary>
     public readonly struct ViscaCommandKey
     {
-        public readonly byte Category;  // byte[1]: 0x01=command, 0x09=inquiry
-        public readonly byte Group;     // byte[2]: 0x04=camera, 0x06=pan/tilt
-        public readonly byte SubCommand;// byte[3]: specific command
+        public readonly byte Category; // byte[1]: 0x01=command, 0x09=inquiry
+        public readonly byte Group; // byte[2]: 0x04=camera, 0x06=pan/tilt
+        public readonly byte SubCommand; // byte[3]: specific command
 
         public ViscaCommandKey(byte category, byte group, byte subCommand)
         {

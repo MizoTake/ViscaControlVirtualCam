@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Net;
 using System.Net.Sockets;
 using System.Threading;
@@ -6,64 +7,55 @@ using System.Threading;
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// Configuration for ViscaServerCore.
+    ///     Configuration for ViscaServerCore.
     /// </summary>
     public sealed class ViscaServerOptions
     {
+        public Action<string> Logger = null;
+        public bool LogReceivedCommands = true;
+        public int MaxClients = 4;
+        public int MaxFrameSize = 4096;
+        public int TcpPort = ViscaProtocol.DefaultTcpPort;
         public ViscaTransport Transport = ViscaTransport.UdpRawVisca;
         public int UdpPort = ViscaProtocol.DefaultUdpPort;
-        public int TcpPort = ViscaProtocol.DefaultTcpPort;
-        public int MaxClients = 4;
         public bool VerboseLog = true;
-        public bool LogReceivedCommands = true;
-        public Action<string> Logger = null;
-        public int MaxFrameSize = 4096;
     }
 
     /// <summary>
-    /// Pure C# VISCA server core. No Unity/MonoBehaviour dependencies.
+    ///     Pure C# VISCA server core. No Unity/MonoBehaviour dependencies.
     /// </summary>
     public sealed class ViscaServerCore : IDisposable
     {
-        private readonly IViscaCommandHandler _handler;
-        private readonly ViscaServerOptions _opt;
-        private readonly ViscaCommandRegistry _commandRegistry;
-        private UdpClient _udp;
-        private TcpListener _tcp;
-        private CancellationTokenSource _cts;
-        private readonly System.Collections.Concurrent.ConcurrentDictionary<TcpClient, ViscaFrameFramer> _clients = new();
-        private int _clientCount = 0;
-
-        private readonly struct ViscaIpEnvelope
-        {
-            public readonly byte TypeMsb;
-            public readonly byte TypeLsb;
-            public readonly ushort PayloadLength;
-            public readonly uint Sequence;
-
-            public ViscaIpEnvelope(byte typeMsb, byte typeLsb, ushort payloadLength, uint sequence)
-            {
-                TypeMsb = typeMsb;
-                TypeLsb = typeLsb;
-                PayloadLength = payloadLength;
-                Sequence = sequence;
-            }
-        }
-
         // Reusable empty responder to avoid allocations during command name lookup
         private static readonly Action<byte[]> EmptyResponder = _ => { };
+
+        private readonly ConcurrentDictionary<TcpClient, ViscaFrameFramer> _clients =
+            new();
+
+        private readonly IViscaCommandHandler _handler;
+        private readonly ViscaServerOptions _opt;
+
+        private int _clientCount;
+        private CancellationTokenSource _cts;
+        private TcpListener _tcp;
+        private UdpClient _udp;
 
         public ViscaServerCore(IViscaCommandHandler handler, ViscaServerOptions options)
         {
             _handler = handler ?? throw new ArgumentNullException(nameof(handler));
             _opt = options ?? new ViscaServerOptions();
-            _commandRegistry = new ViscaCommandRegistry();
+            CommandRegistry = new ViscaCommandRegistry();
         }
 
         /// <summary>
-        /// Access to the command registry for custom command registration
+        ///     Access to the command registry for custom command registration
         /// </summary>
-        public ViscaCommandRegistry CommandRegistry => _commandRegistry;
+        public ViscaCommandRegistry CommandRegistry { get; }
+
+        public void Dispose()
+        {
+            Stop();
+        }
 
         public void Start()
         {
@@ -77,19 +69,48 @@ namespace ViscaControlVirtualCam
 
         public void Stop()
         {
-            try { _cts?.Cancel(); } catch (Exception e) { Log($"Stop cancel error: {e.Message}"); }
-            try { _udp?.Close(); } catch (Exception e) { Log($"UDP close error: {e.Message}"); }
-            try { _tcp?.Stop(); } catch (Exception e) { Log($"TCP stop error: {e.Message}"); }
+            try
+            {
+                _cts?.Cancel();
+            }
+            catch (Exception e)
+            {
+                Log($"Stop cancel error: {e.Message}");
+            }
+
+            try
+            {
+                _udp?.Close();
+            }
+            catch (Exception e)
+            {
+                Log($"UDP close error: {e.Message}");
+            }
+
+            try
+            {
+                _tcp?.Stop();
+            }
+            catch (Exception e)
+            {
+                Log($"TCP stop error: {e.Message}");
+            }
+
             _udp = null;
             _tcp = null;
             _cts = null;
             foreach (var kv in _clients)
-            {
-                try { kv.Key.Close(); }
-                catch (Exception e) { Log($"TCP client close error: {e.Message}"); }
-            }
+                try
+                {
+                    kv.Key.Close();
+                }
+                catch (Exception e)
+                {
+                    Log($"TCP client close error: {e.Message}");
+                }
+
             _clients.Clear();
-            System.Threading.Interlocked.Exchange(ref _clientCount, 0);
+            Interlocked.Exchange(ref _clientCount, 0);
         }
 
         private void StartUdp()
@@ -105,6 +126,7 @@ namespace ViscaControlVirtualCam
                 Log($"UDP begin receive error: {e.Message}");
                 throw;
             }
+
             Log($"VISCA UDP server started on {_opt.UdpPort}");
         }
 
@@ -122,7 +144,7 @@ namespace ViscaControlVirtualCam
             var udp = _udp;
             if (udp == null) return;
 
-            IPEndPoint remote = new IPEndPoint(IPAddress.Any, 0);
+            var remote = new IPEndPoint(IPAddress.Any, 0);
             byte[] data;
             try
             {
@@ -137,21 +159,28 @@ namespace ViscaControlVirtualCam
             {
                 // Only log if still active to avoid noise during shutdown
                 if (_udp != null) Log($"UDP receive error: {e.Message}");
-                try { _udp?.BeginReceive(UdpReceiveCallback, null); }
+                try
+                {
+                    _udp?.BeginReceive(UdpReceiveCallback, null);
+                }
                 catch (Exception ex)
                 {
                     Log($"UDP begin receive error: {ex.Message}");
                 }
+
                 return;
             }
 
-            try { _udp?.BeginReceive(UdpReceiveCallback, null); }
+            try
+            {
+                _udp?.BeginReceive(UdpReceiveCallback, null);
+            }
             catch (Exception e)
             {
                 Log($"UDP begin receive error: {e.Message}");
             }
 
-            Action<byte[]> send = (bytes) =>
+            Action<byte[]> send = bytes =>
             {
                 try
                 {
@@ -176,22 +205,33 @@ namespace ViscaControlVirtualCam
                 try
                 {
                     var client = listener.AcceptTcpClient();
-                    if (System.Threading.Interlocked.Increment(ref _clientCount) > _opt.MaxClients)
+                    if (Interlocked.Increment(ref _clientCount) > _opt.MaxClients)
                     {
                         Log("TCP client refused: max clients reached");
-                        System.Threading.Interlocked.Decrement(ref _clientCount);
-                        try { client.Close(); } catch { }
+                        Interlocked.Decrement(ref _clientCount);
+                        try
+                        {
+                            client.Close();
+                        }
+                        catch
+                        {
+                        }
+
                         continue;
                     }
+
                     client.NoDelay = true;
                     _clients[client] = new ViscaFrameFramer(_opt.MaxFrameSize);
-            ThreadPool.QueueUserWorkItem(_ => ClientLoopTcp(client));
-        }
+                    ThreadPool.QueueUserWorkItem(_ => ClientLoopTcp(client));
+                }
                 catch (SocketException)
                 {
                     if (_tcp == null) break; // shutting down
                 }
-                catch (ObjectDisposedException) { break; }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
                 catch (Exception e)
                 {
                     if (_tcp != null) Log($"TCP accept error: {e.Message}");
@@ -205,7 +245,7 @@ namespace ViscaControlVirtualCam
             using (var stream = client.GetStream())
             {
                 var buffer = new byte[8192];
-                Action<byte[]> send = (bytes) =>
+                Action<byte[]> send = bytes =>
                 {
                     try
                     {
@@ -219,10 +259,18 @@ namespace ViscaControlVirtualCam
                 };
                 while (_cts != null && !_cts.IsCancellationRequested && client.Connected)
                 {
-                    int n; try { n = stream.Read(buffer, 0, buffer.Length); } catch { break; }
+                    int n;
+                    try
+                    {
+                        n = stream.Read(buffer, 0, buffer.Length);
+                    }
+                    catch
+                    {
+                        break;
+                    }
+
                     if (n <= 0) break;
                     if (_clients.TryGetValue(client, out var framer))
-                    {
                         framer.Append(new ReadOnlySpan<byte>(buffer, 0, n), frame =>
                         {
                             if (frame.Length > _opt.MaxFrameSize)
@@ -230,16 +278,14 @@ namespace ViscaControlVirtualCam
                                 Log($"TCP frame too large: {frame.Length}");
                                 return; // drop
                             }
+
                             ProcessFrame(frame, send);
                         });
-                    }
-                    else
-                    {
-                        // No framer state; drop
-                    }
+                    // No framer state; drop
                 }
+
                 _clients.TryRemove(client, out _);
-                System.Threading.Interlocked.Decrement(ref _clientCount);
+                Interlocked.Decrement(ref _clientCount);
             }
         }
 
@@ -247,12 +293,13 @@ namespace ViscaControlVirtualCam
         {
             if (packet == null || packet.Length == 0) return;
 
-            byte[] frame = packet;
-            Action<byte[]> responder = rawSend;
-            bool payloadTypeSupported = true;
-            byte socketIdFromPayload = ViscaProtocol.DefaultSocketId;
+            var frame = packet;
+            var responder = rawSend;
+            var payloadTypeSupported = true;
+            var socketIdFromPayload = ViscaProtocol.DefaultSocketId;
 
-            if (TryParseViscaIpEnvelope(packet, out var envelope, out var payload, out var headerError, out payloadTypeSupported))
+            if (TryParseViscaIpEnvelope(packet, out var envelope, out var payload, out var headerError,
+                    out payloadTypeSupported))
             {
                 responder = WrapResponderWithViscaIpHeader(rawSend, envelope);
                 frame = payload;
@@ -269,11 +316,11 @@ namespace ViscaControlVirtualCam
                     envelope.TypeLsb == ViscaProtocol.IpPayloadTypeLsbControlCommand)
                 {
                     // Treat control payload as keepalive/open/close no-op with completion when well-formed
-                    int maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
-                    bool valid = frame != null &&
-                                 frame.Length > 0 &&
-                                 frame.Length <= maxPayload &&
-                                 frame[^1] == ViscaProtocol.FrameTerminator;
+                    var maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
+                    var valid = frame != null &&
+                                frame.Length > 0 &&
+                                frame.Length <= maxPayload &&
+                                frame[^1] == ViscaProtocol.FrameTerminator;
                     if (!valid)
                     {
                         Log("Invalid VISCA IP control payload (syntax)");
@@ -283,6 +330,7 @@ namespace ViscaControlVirtualCam
                     {
                         ViscaResponse.SendCompletion(responder, ViscaReplyMode.AckAndCompletion, socketIdFromPayload);
                     }
+
                     return;
                 }
 
@@ -295,32 +343,27 @@ namespace ViscaControlVirtualCam
             }
 
             // Validate frame
-            if (!IsValidViscaPayload(frame, responder))
-            {
-                return;
-            }
+            if (!IsValidViscaPayload(frame, responder)) return;
 
             // Log received command (only generate details string when logging enabled)
             if (_opt.LogReceivedCommands)
             {
-                string details = _commandRegistry.GetCommandDetails(frame, responder);
+                var details = CommandRegistry.GetCommandDetails(frame, responder);
                 Log($"RX: {details}");
             }
 
             // Try to execute command through registry (O(1) lookup for most commands)
-            var context = _commandRegistry.TryExecute(frame, _handler, responder);
-            if (context.HasValue)
-            {
-                return;
-            }
+            var context = CommandRegistry.TryExecute(frame, _handler, responder);
+            if (context.HasValue) return;
 
             // Unknown command - send error response
-            string cmdName = _commandRegistry.GetCommandName(frame);
+            var cmdName = CommandRegistry.GetCommandName(frame);
             Log($"WARNING: Unknown command: {cmdName}");
             _handler.HandleError(frame, responder, ViscaProtocol.ErrorSyntax);
         }
 
-        private bool TryParseViscaIpEnvelope(byte[] packet, out ViscaIpEnvelope envelope, out byte[] payload, out string error, out bool supportedPayloadType)
+        private bool TryParseViscaIpEnvelope(byte[] packet, out ViscaIpEnvelope envelope, out byte[] payload,
+            out string error, out bool supportedPayloadType)
         {
             envelope = default;
             payload = packet;
@@ -330,9 +373,10 @@ namespace ViscaControlVirtualCam
             if (packet == null || packet.Length < ViscaProtocol.ViscaIpHeaderLength)
                 return false;
 
-            byte typeMsb = packet[0];
-            byte typeLsb = packet[1];
-            bool looksLikeHeader = typeMsb == ViscaProtocol.IpPayloadTypeMsbVisca || typeMsb == ViscaProtocol.IpPayloadTypeMsbControl;
+            var typeMsb = packet[0];
+            var typeLsb = packet[1];
+            var looksLikeHeader = typeMsb == ViscaProtocol.IpPayloadTypeMsbVisca ||
+                                  typeMsb == ViscaProtocol.IpPayloadTypeMsbControl;
             if (!looksLikeHeader)
                 return false;
 
@@ -343,28 +387,22 @@ namespace ViscaControlVirtualCam
                 (uint)((packet[4] << 24) | (packet[5] << 16) | (packet[6] << 8) | packet[7]));
 
             int declaredLength = envelope.PayloadLength;
-            int actualLength = packet.Length - ViscaProtocol.ViscaIpHeaderLength;
+            var actualLength = packet.Length - ViscaProtocol.ViscaIpHeaderLength;
 
             // Copy available payload for downstream socket extraction even if invalid
-            int copyLength = Math.Max(0, Math.Min(actualLength, declaredLength > 0 ? declaredLength : actualLength));
+            var copyLength = Math.Max(0, Math.Min(actualLength, declaredLength > 0 ? declaredLength : actualLength));
             payload = new byte[copyLength];
-            if (copyLength > 0)
-            {
-                Buffer.BlockCopy(packet, ViscaProtocol.ViscaIpHeaderLength, payload, 0, copyLength);
-            }
+            if (copyLength > 0) Buffer.BlockCopy(packet, ViscaProtocol.ViscaIpHeaderLength, payload, 0, copyLength);
 
             supportedPayloadType =
                 (typeMsb == ViscaProtocol.IpPayloadTypeMsbVisca &&
-                    (typeLsb == ViscaProtocol.IpPayloadTypeLsbCommand ||
-                     typeLsb == ViscaProtocol.IpPayloadTypeLsbInquiry ||
-                     typeLsb == ViscaProtocol.IpPayloadTypeLsbReply)) ||
+                 (typeLsb == ViscaProtocol.IpPayloadTypeLsbCommand ||
+                  typeLsb == ViscaProtocol.IpPayloadTypeLsbInquiry ||
+                  typeLsb == ViscaProtocol.IpPayloadTypeLsbReply)) ||
                 (typeMsb == ViscaProtocol.IpPayloadTypeMsbControl &&
-                     typeLsb == ViscaProtocol.IpPayloadTypeLsbControlCommand);
+                 typeLsb == ViscaProtocol.IpPayloadTypeLsbControlCommand);
 
-            if (!supportedPayloadType)
-            {
-                return true;
-            }
+            if (!supportedPayloadType) return true;
 
             // Enforce documented VISCA payload length (1..16 bytes)
             if (declaredLength <= 0 || declaredLength > ViscaProtocol.MaxFrameLength)
@@ -408,7 +446,7 @@ namespace ViscaControlVirtualCam
                 return false;
             }
 
-            int maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
+            var maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
             if (frame.Length > maxPayload)
             {
                 Log($"Frame too large: {frame.Length} bytes");
@@ -423,15 +461,14 @@ namespace ViscaControlVirtualCam
         {
             return payload =>
             {
-                byte[] effectivePayload = payload;
+                var effectivePayload = payload;
                 if (effectivePayload == null || effectivePayload.Length == 0)
-                {
-                    effectivePayload = new byte[] { 0x90, ViscaProtocol.ResponseError, ViscaProtocol.ErrorSyntax, ViscaProtocol.FrameTerminator };
-                }
+                    effectivePayload = new byte[]
+                        { 0x90, ViscaProtocol.ResponseError, ViscaProtocol.ErrorSyntax, ViscaProtocol.FrameTerminator };
 
-                int maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
-                ushort length = (ushort)Math.Min(effectivePayload.Length, maxPayload);
-                byte[] packet = new byte[ViscaProtocol.ViscaIpHeaderLength + length];
+                var maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
+                var length = (ushort)Math.Min(effectivePayload.Length, maxPayload);
+                var packet = new byte[ViscaProtocol.ViscaIpHeaderLength + length];
                 packet[0] = ViscaProtocol.IpPayloadTypeMsbVisca;
                 packet[1] = ViscaProtocol.IpPayloadTypeLsbReply;
                 packet[2] = (byte)((length >> 8) & 0xFF);
@@ -450,6 +487,20 @@ namespace ViscaControlVirtualCam
             if (_opt.VerboseLog) _opt.Logger?.Invoke(msg);
         }
 
-        public void Dispose() => Stop();
+        private readonly struct ViscaIpEnvelope
+        {
+            public readonly byte TypeMsb;
+            public readonly byte TypeLsb;
+            public readonly ushort PayloadLength;
+            public readonly uint Sequence;
+
+            public ViscaIpEnvelope(byte typeMsb, byte typeLsb, ushort payloadLength, uint sequence)
+            {
+                TypeMsb = typeMsb;
+                TypeLsb = typeLsb;
+                PayloadLength = payloadLength;
+                Sequence = sequence;
+            }
+        }
     }
 }

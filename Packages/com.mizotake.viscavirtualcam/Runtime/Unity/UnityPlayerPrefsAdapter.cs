@@ -3,7 +3,7 @@ using UnityEngine;
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// Unity PlayerPrefs implementation
+    ///     Unity PlayerPrefs implementation
     /// </summary>
     public class UnityPlayerPrefsAdapter : IPlayerPrefsAdapter
     {

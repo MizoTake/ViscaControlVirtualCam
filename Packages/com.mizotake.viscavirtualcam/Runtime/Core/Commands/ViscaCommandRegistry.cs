@@ -4,44 +4,32 @@ using System.Collections.Generic;
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// Delegate for parsing a frame into a command context.
-    /// Returns null if frame doesn't match expected format.
+    ///     Delegate for parsing a frame into a command context.
+    ///     Returns null if frame doesn't match expected format.
     /// </summary>
     public delegate ViscaCommandContext? CommandParser(byte[] frame, Action<byte[]> responder);
 
     /// <summary>
-    /// Registry for VISCA commands with O(1) lookup.
-    /// Commands are indexed by their distinguishing byte pattern.
+    ///     Registry for VISCA commands with O(1) lookup.
+    ///     Commands are indexed by their distinguishing byte pattern.
     /// </summary>
     public sealed class ViscaCommandRegistry
     {
-        /// <summary>
-        /// Registered command entry
-        /// </summary>
-        public readonly struct CommandEntry
-        {
-            public readonly ViscaCommandType Type;
-            public readonly string Name;
-            public readonly CommandParser Parser;
-
-            public CommandEntry(ViscaCommandType type, string name, CommandParser parser)
-            {
-                Type = type;
-                Name = name;
-                Parser = parser;
-            }
-        }
-
         // Primary lookup: key -> command entry (O(1) for exact matches)
-        private readonly Dictionary<int, CommandEntry> _commandsByKey = new Dictionary<int, CommandEntry>();
+        private readonly Dictionary<int, CommandEntry> _commandsByKey = new();
 
         // Secondary lookup for commands that need length/content inspection
-        private readonly List<CommandEntry> _variableLengthCommands = new List<CommandEntry>();
+        private readonly List<CommandEntry> _variableLengthCommands = new();
 
         public ViscaCommandRegistry()
         {
             RegisterDefaultCommands();
         }
+
+        /// <summary>
+        ///     Number of registered commands
+        /// </summary>
+        public int Count => _commandsByKey.Count + _variableLengthCommands.Count;
 
         private void RegisterDefaultCommands()
         {
@@ -70,9 +58,9 @@ namespace ViscaControlVirtualCam
                     // Accept both 13-byte (no speed) and 15+ byte (with speed) variants for compatibility
                     if (frame.Length < 13) return null;
 
-                    bool hasSpeed = frame.Length >= 15;
-                    int posStart = hasSpeed ? 6 : 4; // nibble positions start after optional VV/WW
-                    int requiredLength = posStart + 8 + 1; // 8 nibbles + terminator
+                    var hasSpeed = frame.Length >= 15;
+                    var posStart = hasSpeed ? 6 : 4; // nibble positions start after optional VV/WW
+                    var requiredLength = posStart + 8 + 1; // 8 nibbles + terminator
                     if (frame.Length < requiredLength) return null;
 
                     byte vv = 0, ww = 0;
@@ -82,8 +70,10 @@ namespace ViscaControlVirtualCam
                         ww = frame[5];
                     }
 
-                    ushort pan = ViscaParser.DecodeNibble16(frame[posStart], frame[posStart + 1], frame[posStart + 2], frame[posStart + 3]);
-                    ushort tilt = ViscaParser.DecodeNibble16(frame[posStart + 4], frame[posStart + 5], frame[posStart + 6], frame[posStart + 7]);
+                    var pan = ViscaParser.DecodeNibble16(frame[posStart], frame[posStart + 1], frame[posStart + 2],
+                        frame[posStart + 3]);
+                    var tilt = ViscaParser.DecodeNibble16(frame[posStart + 4], frame[posStart + 5], frame[posStart + 6],
+                        frame[posStart + 7]);
 
                     return ViscaCommandContext.PanTiltAbsolute(frame, responder, vv, ww, pan, tilt);
                 });
@@ -109,7 +99,7 @@ namespace ViscaControlVirtualCam
                 (frame, responder) =>
                 {
                     if (frame.Length < 9) return null;
-                    ushort pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+                    var pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
                     return ViscaCommandContext.ZoomDirect(frame, responder, pos);
                 });
 
@@ -126,7 +116,7 @@ namespace ViscaControlVirtualCam
                 (frame, responder) =>
                 {
                     if (frame.Length < 9) return null;
-                    ushort pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+                    var pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
                     return ViscaCommandContext.FocusDirect(frame, responder, pos);
                 });
 
@@ -155,7 +145,7 @@ namespace ViscaControlVirtualCam
                 (frame, responder) =>
                 {
                     if (frame.Length < 9) return null;
-                    ushort pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
+                    var pos = ViscaParser.DecodeNibble16(frame[4], frame[5], frame[6], frame[7]);
                     return ViscaCommandContext.IrisDirect(frame, responder, pos);
                 });
 
@@ -207,17 +197,17 @@ namespace ViscaControlVirtualCam
         }
 
         /// <summary>
-        /// Register a command with exact 3-byte key match (O(1) lookup)
+        ///     Register a command with exact 3-byte key match (O(1) lookup)
         /// </summary>
         public void Register(byte category, byte group, byte subCommand,
             ViscaCommandType type, string name, CommandParser parser)
         {
-            int key = (category << 16) | (group << 8) | subCommand;
+            var key = (category << 16) | (group << 8) | subCommand;
             _commandsByKey[key] = new CommandEntry(type, name, parser);
         }
 
         /// <summary>
-        /// Register a command that requires additional inspection (falls back to O(n) for these)
+        ///     Register a command that requires additional inspection (falls back to O(n) for these)
         /// </summary>
         public void RegisterVariable(ViscaCommandType type, string name, CommandParser parser)
         {
@@ -225,8 +215,8 @@ namespace ViscaControlVirtualCam
         }
 
         /// <summary>
-        /// Try to parse and execute a command.
-        /// O(1) for standard commands, O(m) for variable-length commands where m is small.
+        ///     Try to parse and execute a command.
+        ///     O(1) for standard commands, O(m) for variable-length commands where m is small.
         /// </summary>
         /// <returns>Command context if handled, null if unknown command</returns>
         public ViscaCommandContext? TryExecute(byte[] frame, IViscaCommandHandler handler, Action<byte[]> responder)
@@ -237,7 +227,7 @@ namespace ViscaControlVirtualCam
             // O(1) lookup for exact key match (only when enough bytes are present)
             if (frame.Length >= 4)
             {
-                int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+                var key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
                 if (_commandsByKey.TryGetValue(key, out var entry))
                 {
                     var contextNullable = entry.Parser(frame, responder);
@@ -266,36 +256,34 @@ namespace ViscaControlVirtualCam
         }
 
         /// <summary>
-        /// Get command name for logging (O(1) for known commands)
+        ///     Get command name for logging (O(1) for known commands)
         /// </summary>
         public string GetCommandName(byte[] frame)
         {
             if (frame == null || frame.Length < 4)
                 return "Invalid";
 
-            int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+            var key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
             if (_commandsByKey.TryGetValue(key, out var entry))
                 return entry.Name;
 
             foreach (var varEntry in _variableLengthCommands)
-            {
                 if (varEntry.Parser(frame, _ => { }) != null)
                     return varEntry.Name;
-            }
 
             return $"Unknown({frame[1]:X2} {frame[2]:X2} {frame[3]:X2})";
         }
 
         /// <summary>
-        /// Get command details for logging.
-        /// Uses lazy description generation to reduce allocations.
+        ///     Get command details for logging.
+        ///     Uses lazy description generation to reduce allocations.
         /// </summary>
         public string GetCommandDetails(byte[] frame, Action<byte[]> responder)
         {
             if (frame == null || frame.Length < 4)
                 return "Invalid frame";
 
-            int key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+            var key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
             if (_commandsByKey.TryGetValue(key, out var entry))
             {
                 var context = entry.Parser(frame, responder);
@@ -314,8 +302,20 @@ namespace ViscaControlVirtualCam
         }
 
         /// <summary>
-        /// Number of registered commands
+        ///     Registered command entry
         /// </summary>
-        public int Count => _commandsByKey.Count + _variableLengthCommands.Count;
+        public readonly struct CommandEntry
+        {
+            public readonly ViscaCommandType Type;
+            public readonly string Name;
+            public readonly CommandParser Parser;
+
+            public CommandEntry(ViscaCommandType type, string name, CommandParser parser)
+            {
+                Type = type;
+                Name = name;
+                Parser = parser;
+            }
+        }
     }
 }

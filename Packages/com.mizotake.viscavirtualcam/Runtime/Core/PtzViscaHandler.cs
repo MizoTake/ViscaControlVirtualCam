@@ -4,24 +4,26 @@ using System.Threading;
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// Bridges VISCA commands to a PtzModel. Pure C#.
-    /// Implements the unified IViscaCommandHandler interface.
+    ///     Bridges VISCA commands to a PtzModel. Pure C#.
+    ///     Implements the unified IViscaCommandHandler interface.
     /// </summary>
     public sealed class PtzViscaHandler : IViscaCommandHandler
     {
-        private readonly PtzModel _model;
-        private readonly Action<Action> _mainThreadDispatcher;
-        private readonly ViscaReplyMode _replyMode;
         private readonly Action<string> _logger;
-        private byte _focusMode = ViscaProtocol.FocusModeManual;
+        private readonly Action<Action> _mainThreadDispatcher;
 
         private readonly int _maxPendingOperations;
+        private readonly PtzModel _model;
+        private readonly ViscaReplyMode _replyMode;
+        private byte _focusMode = ViscaProtocol.FocusModeManual;
         private int _pendingOperations;
 
-        public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode, Action<string> logger = null, int maxPendingOperations = 64)
+        public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode,
+            Action<string> logger = null, int maxPendingOperations = 64)
         {
             _model = model ?? throw new ArgumentNullException(nameof(model));
-            _mainThreadDispatcher = mainThreadDispatcher ?? throw new ArgumentNullException(nameof(mainThreadDispatcher));
+            _mainThreadDispatcher =
+                mainThreadDispatcher ?? throw new ArgumentNullException(nameof(mainThreadDispatcher));
             _replyMode = replyMode;
             _logger = logger;
             _maxPendingOperations = Math.Max(1, maxPendingOperations);
@@ -71,7 +73,7 @@ namespace ViscaControlVirtualCam
 
         public void HandleError(byte[] frame, Action<byte[]> responder, byte errorCode)
         {
-            byte socketId = ViscaProtocol.ExtractSocketId(frame);
+            var socketId = ViscaProtocol.ExtractSocketId(frame);
             ViscaResponse.SendError(responder, errorCode, socketId);
         }
 
@@ -79,11 +81,11 @@ namespace ViscaControlVirtualCam
         {
             var capturedCtx = ctx;
             if (!TryEnqueue(capturedCtx, () =>
-            {
-                var pdir = ViscaParser.DirFromVisca(capturedCtx.PanDirection);
-                var tdir = ViscaParser.DirFromVisca(capturedCtx.TiltDirection);
-                _model.CommandPanTiltVariable(capturedCtx.PanSpeed, capturedCtx.TiltSpeed, pdir, tdir);
-            }))
+                {
+                    var pdir = ViscaParser.DirFromVisca(capturedCtx.PanDirection);
+                    var tdir = ViscaParser.DirFromVisca(capturedCtx.TiltDirection);
+                    _model.CommandPanTiltVariable(capturedCtx.PanSpeed, capturedCtx.TiltSpeed, pdir, tdir);
+                }))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -93,7 +95,9 @@ namespace ViscaControlVirtualCam
         private bool HandlePanTiltAbsolute(in ViscaCommandContext ctx)
         {
             var capturedCtx = ctx;
-            if (!TryEnqueue(capturedCtx, () => _model.CommandPanTiltAbsolute(capturedCtx.PanSpeed, capturedCtx.TiltSpeed, capturedCtx.PanPosition, capturedCtx.TiltPosition)))
+            if (!TryEnqueue(capturedCtx,
+                    () => _model.CommandPanTiltAbsolute(capturedCtx.PanSpeed, capturedCtx.TiltSpeed,
+                        capturedCtx.PanPosition, capturedCtx.TiltPosition)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -113,7 +117,9 @@ namespace ViscaControlVirtualCam
         private bool HandlePanTiltReset(in ViscaCommandContext ctx)
         {
             var capturedCtx2 = ctx;
-            if (!TryEnqueue(capturedCtx2, () => _model.CommandPanTiltAbsolute(0, 0, ViscaProtocol.PositionCenter, ViscaProtocol.PositionCenter)))
+            if (!TryEnqueue(capturedCtx2,
+                    () => _model.CommandPanTiltAbsolute(0, 0, ViscaProtocol.PositionCenter,
+                        ViscaProtocol.PositionCenter)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -164,7 +170,7 @@ namespace ViscaControlVirtualCam
         {
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
             _focusMode = ctx.FocusMode;
-            string modeName = ctx.FocusMode == ViscaProtocol.FocusModeAuto ? "Auto" : "Manual";
+            var modeName = ctx.FocusMode == ViscaProtocol.FocusModeAuto ? "Auto" : "Manual";
             _logger?.Invoke($"Focus Mode: {modeName} (Unity Camera does not support auto focus)");
             ViscaResponse.SendCompletion(ctx.Responder, _replyMode, ctx.SocketId);
             return true;
@@ -230,19 +236,19 @@ namespace ViscaControlVirtualCam
 
         private bool HandlePanTiltPositionInquiry(in ViscaCommandContext ctx)
         {
-            float panRange = _model.PanMaxDeg - _model.PanMinDeg;
-            float tiltRange = _model.TiltMaxDeg - _model.TiltMinDeg;
+            var panRange = _model.PanMaxDeg - _model.PanMinDeg;
+            var tiltRange = _model.TiltMaxDeg - _model.TiltMinDeg;
 
             // Avoid division by zero using consistent epsilon
-            float panNorm = panRange > ViscaProtocol.DivisionEpsilon
+            var panNorm = panRange > ViscaProtocol.DivisionEpsilon
                 ? (_model.CurrentPanDeg - _model.PanMinDeg) / panRange
                 : 0.5f;
-            float tiltNorm = tiltRange > ViscaProtocol.DivisionEpsilon
+            var tiltNorm = tiltRange > ViscaProtocol.DivisionEpsilon
                 ? (_model.CurrentTiltDeg - _model.TiltMinDeg) / tiltRange
                 : 0.5f;
 
-            ushort panPos = (ushort)(Clamp01(panNorm) * 65535f);
-            ushort tiltPos = (ushort)(Clamp01(tiltNorm) * 65535f);
+            var panPos = (ushort)(Clamp01(panNorm) * 65535f);
+            var tiltPos = (ushort)(Clamp01(tiltNorm) * 65535f);
 
             ViscaResponse.SendInquiryResponse32(ctx.Responder, panPos, tiltPos, ctx.SocketId);
             return true;
@@ -250,15 +256,15 @@ namespace ViscaControlVirtualCam
 
         private bool HandleZoomPositionInquiry(in ViscaCommandContext ctx)
         {
-            float fovRange = _model.MaxFov - _model.MinFov;
+            var fovRange = _model.MaxFov - _model.MinFov;
 
             // Avoid division by zero using consistent epsilon
-            float fovNorm = fovRange > ViscaProtocol.DivisionEpsilon
+            var fovNorm = fovRange > ViscaProtocol.DivisionEpsilon
                 ? (_model.CurrentFovDeg - _model.MinFov) / fovRange
                 : 0.5f;
 
             // Inverted: small FOV = high zoom position
-            ushort zoomPos = (ushort)((1.0f - Clamp01(fovNorm)) * 65535f);
+            var zoomPos = (ushort)((1.0f - Clamp01(fovNorm)) * 65535f);
 
             ViscaResponse.SendInquiryResponse16(ctx.Responder, zoomPos, ctx.SocketId);
             return true;
@@ -266,7 +272,7 @@ namespace ViscaControlVirtualCam
 
         private bool HandleFocusPositionInquiry(in ViscaCommandContext ctx)
         {
-            ushort focusPos = (ushort)_model.CurrentFocus;
+            var focusPos = (ushort)_model.CurrentFocus;
             ViscaResponse.SendInquiryResponse16(ctx.Responder, focusPos, ctx.SocketId);
             return true;
         }
@@ -294,12 +300,12 @@ namespace ViscaControlVirtualCam
             }
 
             var responder = ctx.Responder;
-            byte socketId = ctx.SocketId;
+            var socketId = ctx.SocketId;
 
             Interlocked.Increment(ref _pendingOperations);
             _mainThreadDispatcher(() =>
             {
-                bool shouldComplete = true;
+                var shouldComplete = true;
                 try
                 {
                     action();
@@ -313,16 +319,16 @@ namespace ViscaControlVirtualCam
                 finally
                 {
                     Interlocked.Decrement(ref _pendingOperations);
-                    if (shouldComplete)
-                    {
-                        ViscaResponse.SendCompletion(responder, _replyMode, socketId);
-                    }
+                    if (shouldComplete) ViscaResponse.SendCompletion(responder, _replyMode, socketId);
                 }
             });
 
             return true;
         }
 
-        private static float Clamp01(float v) => v < 0f ? 0f : (v > 1f ? 1f : v);
+        private static float Clamp01(float v)
+        {
+            return v < 0f ? 0f : v > 1f ? 1f : v;
+        }
     }
 }

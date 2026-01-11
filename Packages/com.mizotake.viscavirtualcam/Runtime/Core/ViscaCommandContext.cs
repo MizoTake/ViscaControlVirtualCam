@@ -3,7 +3,7 @@ using System;
 namespace ViscaControlVirtualCam
 {
     /// <summary>
-    /// All supported VISCA command types
+    ///     All supported VISCA command types
     /// </summary>
     public enum ViscaCommandType
     {
@@ -41,32 +41,32 @@ namespace ViscaControlVirtualCam
         FocusModeInquiry,
 
         // Control commands
-        CommandCancel,
+        CommandCancel
     }
 
     /// <summary>
-    /// Encapsulates all data needed to handle a VISCA command.
-    /// Immutable struct to avoid allocations.
+    ///     Encapsulates all data needed to handle a VISCA command.
+    ///     Immutable struct to avoid allocations.
     /// </summary>
     public readonly struct ViscaCommandContext
     {
         /// <summary>
-        /// The type of command
+        ///     The type of command
         /// </summary>
         public readonly ViscaCommandType CommandType;
 
         /// <summary>
-        /// Raw frame bytes (for reference/logging)
+        ///     Raw frame bytes (for reference/logging)
         /// </summary>
         public readonly byte[] Frame;
 
         /// <summary>
-        /// Response callback
+        ///     Response callback
         /// </summary>
         public readonly Action<byte[]> Responder;
 
         /// <summary>
-        /// VISCA socket id (lower nibble of first byte). Defaults to 1 for raw VISCA.
+        ///     VISCA socket id (lower nibble of first byte). Defaults to 1 for raw VISCA.
         /// </summary>
         public readonly byte SocketId;
 
@@ -140,9 +140,9 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.PanTiltDrive, frame, responder,
-                socketId: GetSocketId(frame),
-                panSpeed: panSpeed, tiltSpeed: tiltSpeed,
-                panDirection: panDir, tiltDirection: tiltDir);
+                GetSocketId(frame),
+                panSpeed, tiltSpeed,
+                panDir, tiltDir);
         }
 
         public static ViscaCommandContext PanTiltAbsolute(byte[] frame, Action<byte[]> responder,
@@ -150,26 +150,26 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.PanTiltAbsolute, frame, responder,
-                socketId: GetSocketId(frame),
-                panSpeed: panSpeed, tiltSpeed: tiltSpeed,
+                GetSocketId(frame),
+                panSpeed, tiltSpeed,
                 panPosition: panPos, tiltPosition: tiltPos);
         }
 
         public static ViscaCommandContext PanTiltHome(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.PanTiltHome, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.PanTiltHome, frame, responder, GetSocketId(frame));
         }
 
         public static ViscaCommandContext PanTiltReset(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.PanTiltReset, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.PanTiltReset, frame, responder, GetSocketId(frame));
         }
 
         public static ViscaCommandContext ZoomVariable(byte[] frame, Action<byte[]> responder, byte zoomSpeed)
         {
             return new ViscaCommandContext(
                 ViscaCommandType.ZoomVariable, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 zoomSpeed: zoomSpeed);
         }
 
@@ -177,7 +177,7 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.ZoomDirect, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 zoomPosition: zoomPos);
         }
 
@@ -185,7 +185,7 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.FocusVariable, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 focusSpeed: focusSpeed);
         }
 
@@ -193,7 +193,7 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.FocusDirect, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 focusPosition: focusPos);
         }
 
@@ -201,20 +201,20 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.FocusMode, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 focusMode: mode);
         }
 
         public static ViscaCommandContext FocusOnePush(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.FocusOnePush, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.FocusOnePush, frame, responder, GetSocketId(frame));
         }
 
         public static ViscaCommandContext IrisVariable(byte[] frame, Action<byte[]> responder, byte irisDir)
         {
             return new ViscaCommandContext(
                 ViscaCommandType.IrisVariable, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 irisDirection: irisDir);
         }
 
@@ -222,7 +222,7 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.IrisDirect, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 irisPosition: irisPos);
         }
 
@@ -230,7 +230,7 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.MemoryRecall, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 memoryNumber: memNum);
         }
 
@@ -238,7 +238,7 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.MemorySet, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 memoryNumber: memNum);
         }
 
@@ -246,37 +246,38 @@ namespace ViscaControlVirtualCam
         {
             return new ViscaCommandContext(
                 ViscaCommandType.MemoryReset, frame, responder,
-                socketId: GetSocketId(frame),
+                GetSocketId(frame),
                 memoryNumber: memNum);
         }
 
         public static ViscaCommandContext PanTiltPositionInquiry(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.PanTiltPositionInquiry, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.PanTiltPositionInquiry, frame, responder,
+                GetSocketId(frame));
         }
 
         public static ViscaCommandContext ZoomPositionInquiry(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.ZoomPositionInquiry, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.ZoomPositionInquiry, frame, responder, GetSocketId(frame));
         }
 
         public static ViscaCommandContext FocusPositionInquiry(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.FocusPositionInquiry, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.FocusPositionInquiry, frame, responder, GetSocketId(frame));
         }
 
         public static ViscaCommandContext FocusModeInquiry(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.FocusModeInquiry, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.FocusModeInquiry, frame, responder, GetSocketId(frame));
         }
 
         public static ViscaCommandContext CommandCancel(byte[] frame, Action<byte[]> responder)
         {
-            return new ViscaCommandContext(ViscaCommandType.CommandCancel, frame, responder, socketId: GetSocketId(frame));
+            return new ViscaCommandContext(ViscaCommandType.CommandCancel, frame, responder, GetSocketId(frame));
         }
 
         /// <summary>
-        /// Human-readable description for logging (lazy generation)
+        ///     Human-readable description for logging (lazy generation)
         /// </summary>
         public string GetDescription()
         {
@@ -332,9 +333,9 @@ namespace ViscaControlVirtualCam
         private static string FormatZoomDirection(byte zz)
         {
             if (zz == 0x00) return "Stop";
-            int dir = (zz >> 4) & 0x0F;
-            int speed = zz & 0x0F;
-            string dirStr = dir == ViscaProtocol.ZoomTeleNibble ? "Tele" : "Wide";
+            var dir = (zz >> 4) & 0x0F;
+            var speed = zz & 0x0F;
+            var dirStr = dir == ViscaProtocol.ZoomTeleNibble ? "Tele" : "Wide";
             return $"{dirStr} Speed={speed}";
         }
 

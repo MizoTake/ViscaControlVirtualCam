@@ -17,12 +17,16 @@ namespace ViscaControlVirtualCam
         public float tiltMaxDeg = 90f;
         public float moveDamping = 6f;
 
-        [Header("Speed Mapping")] [Range(0.1f, 3f)] public float speedGamma = 1.0f;
-        [Tooltip("Pan speed min/max VISCA values")] public byte panVmin = 0x01, panVmax = 0x18;
-        [Tooltip("Tilt speed min/max VISCA values")] public byte tiltVmin = 0x01, tiltVmax = 0x14;
+        [Header("Speed Mapping")] [Range(0.1f, 3f)]
+        public float speedGamma = 1.0f;
 
-        [Header("Control Options")]
-        [Tooltip("Invert horizontal control (Left/Right)")]
+        [Tooltip("Pan speed min/max VISCA values")]
+        public byte panVmin = 0x01, panVmax = 0x18;
+
+        [Tooltip("Tilt speed min/max VISCA values")]
+        public byte tiltVmin = 0x01, tiltVmax = 0x14;
+
+        [Header("Control Options")] [Tooltip("Invert horizontal control (Left/Right)")]
         public bool invertPan;
 
         [Tooltip("Invert vertical control (Up/Down)")]
