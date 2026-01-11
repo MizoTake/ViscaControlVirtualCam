@@ -146,11 +146,11 @@
 - VISCA Command: 受理時 ACK、完了時 Completion を返送。
 - Inquiry: クエリハンドラに転送し、`Reply`（0x01 0x11）の形式で応答ペイロードを返送。
 - Reply: 本実装が送出した Inquiry に対する応答として関連付け、待機中でなければログ記録のみ。
- - Control Command: ソケット Open/Close/KeepAlive など、状態管理コマンドとして処理（該当しない内容は Error）。
+ - Control Command: ソケット Open/Close/KeepAlive など、状態管理コマンドとして処理（本実装では内容を解釈せず、末尾が `0xFF` の場合 Completion を返す。終端なしなど不正ペイロードは Syntax(0x02)）。
 
 #### ヘッダ: Byte2–3 = Payload Length（ビッグエンディアン）
 - 意味: 後続ペイロード（VISCA バイト列）の長さ（バイト数）。
-- 範囲: 1〜16（上限16）。0 または 16超は不正。
+- 範囲: 1〜16（上限16）。0 または 16超は不正で即 Error（MessageLength）。
 - エンディアン: ビッグエンディアン（Network Byte Order）。
 - 検証: 受信実長と一致しない場合は長さ不一致として Error（可能であればヘッダを反映して返信）。
 
@@ -218,14 +218,16 @@
 - 応答: 直後に「Command Canceled」を返却（正常動作として扱う）。
   - 形式: `90 6Z 04 FF`（Error クラスの 0x04=Canceled を用いるが、キャンセル成功通知として期待値）。
   - 実装メモ: ACK は省略可（仕様上は即時に Canceled を返す挙動を優先）。
-- 実行中コマンドがない場合は `Not Executable`（`90 6Z 41 FF`）を推奨。
+- 実行中コマンドがない場合も同様に `90 6Z 04 FF` を返却する（キャンセル要求を正常応答として扱う）。
 
 ### 実装ステータス（パッケージ版）
 - VISCA over IP ヘッダ受信時は `0x01 0x11` ヘッダで Sequence をエコーして返信する（ペイロード長 1–16 のみ）。
 - ACK/Completion/Error はソケット nibble（`Z`）を必ず反映 (`90 4Z/5Z/6Z ... FF`)。Raw VISCA 受信時の既定 `Z=1`。
 - Command Cancel (`8X 2Z FF`) に対応し、即時に `90 6Z 04 FF` を返す。ソケット番号は `2Z` バイトから抽出。
+- VISCA over IP の Payload Length は 1〜16 を厳格に検証し、超過/不一致は `Message Length(0x01)` で応答。
 - バッファ満杯時は `Buffer Full(0x03)` を返却（内部キュー上限超過時）。状態不整合や処理不能例外時は `Not Executable(0x41)` を返す。
 - 構文不正/長さ超過時は Syntax(0x02) を返却。
+- Control Command（`0x02 0x00`）はペイロード終端 `0xFF` を確認し、終端ありは Completion で応答、終端なしなど不正は Syntax(0x02)。
 
 ## Raw VISCA（Serial 互換）モード（TCP）
 - 概要

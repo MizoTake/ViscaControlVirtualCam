@@ -67,12 +67,24 @@ namespace ViscaControlVirtualCam
             Register(0x01, 0x06, 0x02, ViscaCommandType.PanTiltAbsolute, "PanTiltAbsolute",
                 (frame, responder) =>
                 {
-                    if (frame.Length < 15) return null;
-                    int idx = 4;
+                    // Accept both 13-byte (no speed) and 15+ byte (with speed) variants for compatibility
+                    if (frame.Length < 13) return null;
+
+                    bool hasSpeed = frame.Length >= 15;
+                    int posStart = hasSpeed ? 6 : 4; // nibble positions start after optional VV/WW
+                    int requiredLength = posStart + 8 + 1; // 8 nibbles + terminator
+                    if (frame.Length < requiredLength) return null;
+
                     byte vv = 0, ww = 0;
-                    if (frame.Length >= 17) { vv = frame[idx++]; ww = frame[idx++]; }
-                    ushort pan = ViscaParser.DecodeNibble16(frame[idx], frame[idx + 1], frame[idx + 2], frame[idx + 3]);
-                    ushort tilt = ViscaParser.DecodeNibble16(frame[idx + 4], frame[idx + 5], frame[idx + 6], frame[idx + 7]);
+                    if (hasSpeed)
+                    {
+                        vv = frame[4];
+                        ww = frame[5];
+                    }
+
+                    ushort pan = ViscaParser.DecodeNibble16(frame[posStart], frame[posStart + 1], frame[posStart + 2], frame[posStart + 3]);
+                    ushort tilt = ViscaParser.DecodeNibble16(frame[posStart + 4], frame[posStart + 5], frame[posStart + 6], frame[posStart + 7]);
+
                     return ViscaCommandContext.PanTiltAbsolute(frame, responder, vv, ww, pan, tilt);
                 });
 

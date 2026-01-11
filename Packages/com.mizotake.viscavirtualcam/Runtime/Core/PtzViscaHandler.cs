@@ -279,14 +279,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleCommandCancel(in ViscaCommandContext ctx)
         {
-            // Immediately notify cancellation
-            if (_pendingOperations <= 0)
-            {
-                ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandNotExecutable, ctx.SocketId);
-                return true;
-            }
-
-            Interlocked.Exchange(ref _pendingOperations, 0); // best-effort clear
+            // Always acknowledge cancel as CommandCanceled per spec, even if nothing is pending
+            Interlocked.Exchange(ref _pendingOperations, 0); // best-effort clear any pending work
             ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandCancelled, ctx.SocketId);
             return true;
         }

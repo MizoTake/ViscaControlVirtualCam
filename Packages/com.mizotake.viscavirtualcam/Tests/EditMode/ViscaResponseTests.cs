@@ -76,6 +76,19 @@ public class ViscaResponseTests
         CollectionAssert.AreEqual(new byte[] { 0x90, 0x63, 0x04, 0xFF }, sent);
     }
 
+    [Test]
+    public void CommandCancel_NoPending_StillReturnsCanceled()
+    {
+        var model = new PtzModel();
+        byte[] sent = null;
+        var handler = new PtzViscaHandler(model, a => a(), ViscaReplyMode.AckAndCompletion, _ => { });
+        var ctx = ViscaCommandContext.CommandCancel(new byte[] { 0x81, 0x21, 0xFF }, b => sent = b);
+
+        handler.Handle(in ctx);
+
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x61, 0x04, 0xFF }, sent);
+    }
+
     private sealed class CapturingHandler : IViscaCommandHandler
     {
         public ViscaCommandContext? LastContext;

@@ -249,11 +249,42 @@ namespace ViscaControlVirtualCam
 
             byte[] frame = packet;
             Action<byte[]> responder = rawSend;
+            bool payloadTypeSupported = true;
+            byte socketIdFromPayload = ViscaProtocol.DefaultSocketId;
 
-            if (TryParseViscaIpEnvelope(packet, out var envelope, out var payload, out var headerError))
+            if (TryParseViscaIpEnvelope(packet, out var envelope, out var payload, out var headerError, out payloadTypeSupported))
             {
                 responder = WrapResponderWithViscaIpHeader(rawSend, envelope);
                 frame = payload;
+                socketIdFromPayload = ViscaProtocol.ExtractSocketId(payload);
+
+                if (!payloadTypeSupported)
+                {
+                    Log($"Unsupported VISCA IP payload type: {envelope.TypeMsb:X2}{envelope.TypeLsb:X2}");
+                    ViscaResponse.SendError(responder, ViscaProtocol.ErrorCommandNotExecutable, socketIdFromPayload);
+                    return;
+                }
+
+                if (envelope.TypeMsb == ViscaProtocol.IpPayloadTypeMsbControl &&
+                    envelope.TypeLsb == ViscaProtocol.IpPayloadTypeLsbControlCommand)
+                {
+                    // Treat control payload as keepalive/open/close no-op with completion when well-formed
+                    int maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
+                    bool valid = frame != null &&
+                                 frame.Length > 0 &&
+                                 frame.Length <= maxPayload &&
+                                 frame[^1] == ViscaProtocol.FrameTerminator;
+                    if (!valid)
+                    {
+                        Log("Invalid VISCA IP control payload (syntax)");
+                        _handler.HandleError(frame ?? Array.Empty<byte>(), responder, ViscaProtocol.ErrorSyntax);
+                    }
+                    else
+                    {
+                        ViscaResponse.SendCompletion(responder, ViscaReplyMode.AckAndCompletion, socketIdFromPayload);
+                    }
+                    return;
+                }
 
                 if (!string.IsNullOrEmpty(headerError))
                 {
@@ -264,24 +295,8 @@ namespace ViscaControlVirtualCam
             }
 
             // Validate frame
-            if (frame.Length < ViscaProtocol.MinFrameLength)
+            if (!IsValidViscaPayload(frame, responder))
             {
-                Log($"Frame too short: {frame.Length} bytes");
-                _handler.HandleError(frame, responder, ViscaProtocol.ErrorMessageLength);
-                return;
-            }
-
-            if (frame[^1] != ViscaProtocol.FrameTerminator)
-            {
-                Log($"Invalid VISCA frame (no terminator): {BitConverter.ToString(frame)}");
-                _handler.HandleError(frame, responder, ViscaProtocol.ErrorSyntax);
-                return;
-            }
-
-            if (frame.Length > _opt.MaxFrameSize)
-            {
-                Log($"Frame too large: {frame.Length} bytes");
-                _handler.HandleError(frame, responder, ViscaProtocol.ErrorMessageLength);
                 return;
             }
 
@@ -305,11 +320,12 @@ namespace ViscaControlVirtualCam
             _handler.HandleError(frame, responder, ViscaProtocol.ErrorSyntax);
         }
 
-        private bool TryParseViscaIpEnvelope(byte[] packet, out ViscaIpEnvelope envelope, out byte[] payload, out string error)
+        private bool TryParseViscaIpEnvelope(byte[] packet, out ViscaIpEnvelope envelope, out byte[] payload, out string error, out bool supportedPayloadType)
         {
             envelope = default;
             payload = packet;
             error = null;
+            supportedPayloadType = true;
 
             if (packet == null || packet.Length < ViscaProtocol.ViscaIpHeaderLength)
                 return false;
@@ -337,7 +353,7 @@ namespace ViscaControlVirtualCam
                 Buffer.BlockCopy(packet, ViscaProtocol.ViscaIpHeaderLength, payload, 0, copyLength);
             }
 
-            bool supportedPayloadType =
+            supportedPayloadType =
                 (typeMsb == ViscaProtocol.IpPayloadTypeMsbVisca &&
                     (typeLsb == ViscaProtocol.IpPayloadTypeLsbCommand ||
                      typeLsb == ViscaProtocol.IpPayloadTypeLsbInquiry ||
@@ -347,11 +363,11 @@ namespace ViscaControlVirtualCam
 
             if (!supportedPayloadType)
             {
-                error = $"Unsupported VISCA IP payload type: {typeMsb:X2}{typeLsb:X2}";
                 return true;
             }
 
-            if (declaredLength <= 0 || declaredLength > _opt.MaxFrameSize)
+            // Enforce documented VISCA payload length (1..16 bytes)
+            if (declaredLength <= 0 || declaredLength > ViscaProtocol.MaxFrameLength)
             {
                 error = $"Invalid VISCA IP payload length: {declaredLength}";
                 return true;
@@ -363,8 +379,43 @@ namespace ViscaControlVirtualCam
                 return true;
             }
 
+            if (actualLength > ViscaProtocol.MaxFrameLength)
+            {
+                error = $"VISCA IP payload exceeds max length: {actualLength}";
+                return true;
+            }
+
             payload = new byte[declaredLength];
             Buffer.BlockCopy(packet, ViscaProtocol.ViscaIpHeaderLength, payload, 0, declaredLength);
+            return true;
+        }
+
+        private bool IsValidViscaPayload(byte[] frame, Action<byte[]> responder)
+        {
+            var safeResponder = responder ?? (_ => { });
+
+            if (frame == null || frame.Length < ViscaProtocol.MinFrameLength)
+            {
+                Log($"Frame too short: {frame?.Length ?? 0} bytes");
+                _handler.HandleError(frame ?? Array.Empty<byte>(), safeResponder, ViscaProtocol.ErrorMessageLength);
+                return false;
+            }
+
+            if (frame[^1] != ViscaProtocol.FrameTerminator)
+            {
+                Log($"Invalid VISCA frame (no terminator): {BitConverter.ToString(frame)}");
+                _handler.HandleError(frame, safeResponder, ViscaProtocol.ErrorSyntax);
+                return false;
+            }
+
+            int maxPayload = Math.Min(_opt.MaxFrameSize, ViscaProtocol.MaxFrameLength);
+            if (frame.Length > maxPayload)
+            {
+                Log($"Frame too large: {frame.Length} bytes");
+                _handler.HandleError(frame, safeResponder, ViscaProtocol.ErrorMessageLength);
+                return false;
+            }
+
             return true;
         }
 
