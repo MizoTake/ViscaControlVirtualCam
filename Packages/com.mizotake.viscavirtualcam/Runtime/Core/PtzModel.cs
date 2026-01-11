@@ -20,15 +20,13 @@ namespace ViscaControlVirtualCam
         public float IrisPos;
     }
 
-    // Pure C# PTZ core: holds state and computes step deltas from commands.
+    /// <summary>
+    ///     Pure C# PTZ core: holds state and computes step deltas from commands.
+    ///     Delegates memory management to PtzMemoryManager and math operations to PtzMathUtils.
+    /// </summary>
     public class PtzModel
     {
-        // Memory presets (Blackmagic PTZ Control)
-        private readonly Dictionary<byte, PtzMemoryPreset> _memoryPresets = new();
-
-        // PlayerPrefs adapter for persistence
-        private readonly IPlayerPrefsAdapter _playerPrefs;
-        private readonly string _prefsKeyPrefix;
+        private readonly PtzMemoryManager _memoryManager;
 
         // Home (initial) baseline
         private bool _hasHome;
@@ -37,85 +35,91 @@ namespace ViscaControlVirtualCam
         private float _homeIris;
         private float _homePanDeg;
         private float _homeTiltDeg;
+
+        // Velocity state
         private float _omegaFocus; // +far, units/s
         private float _omegaFov; // +increase FOV, deg/s
         private float _omegaFovCurrent;
         private float _omegaIris; // +open, units/s
-
         private float _omegaPan; // +right, deg/s
-
-        // Acceleration-limited velocities (optional)
         private float _omegaPanCurrent;
         private float _omegaTilt; // +up, deg/s
         private float _omegaTiltCurrent;
-        private float? _targetFocus; // absolute target focus
-        private float? _targetFov; // absolute target FOV
-        private float? _targetIris; // absolute target iris
 
-        private float? _targetPanDeg; // absolute target yaw
-        private float? _targetTiltDeg; // absolute target pitch
+        // Absolute targets
+        private float? _targetFocus;
+        private float? _targetFov;
+        private float? _targetIris;
+        private float? _targetPanDeg;
+        private float? _targetTiltDeg;
+
+        #region Configuration Properties
+
+        // Focus/Iris limits
         public float FocusMax = 65535f;
-
-        // Blackmagic PTZ Control: Focus/Iris support
-        public float FocusMaxSpeed = 100f; // units/sec
+        public float FocusMaxSpeed = 100f;
         public float FocusMin = 0f;
 
+        // Inversion settings
         public bool InvertPan;
         public bool InvertPanAbsolute;
         public bool InvertTilt;
         public bool InvertTiltAbsolute;
+
+        // Iris limits
         public float IrisMax = 65535f;
-        public float IrisMaxSpeed = 50f; // units/sec
+        public float IrisMaxSpeed = 50f;
         public float IrisMin = 0f;
+
+        // FOV limits
         public float MaxFov = 90f;
         public float MinFov = 15f;
-        public float MoveDamping = 6f; // for absolute moves
+
+        // Motion parameters
+        public float MoveDamping = 6f;
         public float PanAccelDegPerSec2 = 600f;
-
         public float PanMaxDeg = 170f;
-
-        // Limits and mapping
         public float PanMaxDegPerSec = 120f;
-
         public float PanMinDeg = -170f;
         public byte PanVmin = 0x01, PanVmax = 0x18;
-
         public float SpeedGamma = 1.0f;
         public float TiltAccelDegPerSec2 = 600f;
         public float TiltMaxDeg = 90f;
         public float TiltMaxDegPerSec = 90f;
         public float TiltMinDeg = -30f;
         public byte TiltVmin = 0x01, TiltVmax = 0x14;
-
         public bool UseAccelerationLimit;
         public float ZoomAccelDegPerSec2 = 300f;
         public float ZoomMaxFovPerSec = 40f;
 
+        #endregion
+
         /// <summary>
-        ///     Constructor with optional PlayerPrefs adapter for persistence
+        ///     Constructor with optional PlayerPrefs adapter for persistence.
         /// </summary>
         /// <param name="playerPrefs">PlayerPrefs adapter (null = no persistence)</param>
         /// <param name="prefsKeyPrefix">Prefix for PlayerPrefs keys (default: "ViscaPtz_")</param>
         public PtzModel(IPlayerPrefsAdapter playerPrefs = null, string prefsKeyPrefix = "ViscaPtz_")
         {
-            _playerPrefs = playerPrefs;
-            _prefsKeyPrefix = prefsKeyPrefix;
-
-            // Load presets from PlayerPrefs if available
-            if (_playerPrefs != null) LoadAllPresets();
+            _memoryManager = new PtzMemoryManager(playerPrefs, prefsKeyPrefix);
         }
 
-        // Current state for memory operations
+        #region Current State Properties
+
         public float CurrentPanDeg { get; private set; }
         public float CurrentTiltDeg { get; private set; }
         public float CurrentFovDeg { get; private set; }
         public float CurrentFocus { get; private set; }
         public float CurrentIris { get; private set; }
 
+        #endregion
+
+        #region Pan/Tilt Commands
+
         public void CommandPanTiltVariable(byte vv, byte ww, AxisDirection panDir, AxisDirection tiltDir)
         {
-            var vPan = MapSpeed(vv, PanVmin, PanVmax, PanMaxDegPerSec, SpeedGamma);
-            var vTilt = MapSpeed(ww, TiltVmin, TiltVmax, TiltMaxDegPerSec, SpeedGamma);
+            var vPan = PtzMathUtils.MapSpeed(vv, PanVmin, PanVmax, PanMaxDegPerSec, SpeedGamma);
+            var vTilt = PtzMathUtils.MapSpeed(ww, TiltVmin, TiltVmax, TiltMaxDegPerSec, SpeedGamma);
             var panSign = panDir == AxisDirection.Positive ? 1f : -1f;
             var tiltSign = tiltDir == AxisDirection.Positive ? 1f : -1f;
             if (InvertPan) panSign *= -1f;
@@ -133,6 +137,25 @@ namespace ViscaControlVirtualCam
             _omegaTilt = 0f;
         }
 
+        public void CommandPanTiltAbsolute(byte vv, byte ww, ushort panPos, ushort tiltPos)
+        {
+            var panNorm = panPos / 65535f;
+            var tiltNorm = tiltPos / 65535f;
+            if (InvertPanAbsolute) panNorm = 1f - panNorm;
+            if (InvertTiltAbsolute) tiltNorm = 1f - tiltNorm;
+
+            var panDeg = PtzMathUtils.Lerp(PanMinDeg, PanMaxDeg, panNorm);
+            var tiltDeg = PtzMathUtils.Lerp(TiltMinDeg, TiltMaxDeg, tiltNorm);
+            _targetPanDeg = panDeg;
+            _targetTiltDeg = tiltDeg;
+            _omegaPan = 0f;
+            _omegaTilt = 0f;
+        }
+
+        #endregion
+
+        #region Zoom Commands
+
         public void CommandZoomVariable(byte zz)
         {
             if (zz == 0x00)
@@ -141,32 +164,68 @@ namespace ViscaControlVirtualCam
                 return;
             }
 
-            var dirNibble = (zz & 0xF0) >> 4; // 0x2p Tele, 0x3p Wide
-            var p = zz & 0x0F;
-            p = Clamp(p, 0, 7);
+            var dirNibble = (zz & 0xF0) >> 4;
+            var p = PtzMathUtils.Clamp(zz & 0x0F, 0, 7);
             var speed = (float)Math.Pow(p / 7f, Math.Max(0.01f, SpeedGamma)) * ZoomMaxFovPerSec;
-            var sign = dirNibble == 0x2 ? -1f : +1f; // Tele reduces FOV
+            var sign = dirNibble == 0x2 ? -1f : +1f;
             _omegaFov = speed * sign;
         }
 
-        public void CommandPanTiltAbsolute(byte vv, byte ww, ushort panPos, ushort tiltPos)
+        public void CommandZoomDirect(ushort zoomPos)
         {
-            var panNorm = panPos / 65535f;
-            var tiltNorm = tiltPos / 65535f;
-            if (InvertPanAbsolute) panNorm = 1f - panNorm;
-            if (InvertTiltAbsolute) tiltNorm = 1f - tiltNorm;
-
-            var panDeg = Lerp(PanMinDeg, PanMaxDeg, panNorm);
-            var tiltDeg = Lerp(TiltMinDeg, TiltMaxDeg, tiltNorm);
-            _targetPanDeg = panDeg;
-            _targetTiltDeg = tiltDeg;
-            _omegaPan = 0f;
-            _omegaTilt = 0f;
+            var fov = PtzMathUtils.Lerp(MinFov, MaxFov, zoomPos / 65535f);
+            _targetFov = fov;
+            _omegaFov = 0f;
         }
 
-        /// <summary>
-        ///     Set home baseline (initial values) used by Home command
-        /// </summary>
+        #endregion
+
+        #region Focus Commands
+
+        public void CommandFocusVariable(byte focusSpeed)
+        {
+            if (focusSpeed == 0x00)
+            {
+                _omegaFocus = 0f;
+                return;
+            }
+
+            var sign = focusSpeed == 0x02 ? 1f : -1f;
+            _omegaFocus = FocusMaxSpeed * sign;
+        }
+
+        public void CommandFocusDirect(ushort focusPos)
+        {
+            _targetFocus = focusPos;
+            _omegaFocus = 0f;
+        }
+
+        #endregion
+
+        #region Iris Commands
+
+        public void CommandIrisVariable(byte irisDir)
+        {
+            if (irisDir == 0x00)
+            {
+                _omegaIris = 0f;
+                return;
+            }
+
+            var sign = irisDir == 0x02 ? 1f : -1f;
+            _omegaIris = IrisMaxSpeed * sign;
+        }
+
+        public void CommandIrisDirect(ushort irisPos)
+        {
+            _targetIris = irisPos;
+            _omegaIris = 0f;
+        }
+
+        #endregion
+
+        #region Home Command
+
         public void SetHomeBaseline(float panDeg, float tiltDeg, float fovDeg, float focus, float iris)
         {
             _homePanDeg = panDeg;
@@ -177,17 +236,13 @@ namespace ViscaControlVirtualCam
             _hasHome = true;
         }
 
-        /// <summary>
-        ///     Reset targets to home baseline (Pan/Tilt/FOV/Focus/Iris)
-        /// </summary>
         public void CommandHome()
         {
             if (!_hasHome)
             {
-                // If home not set, default to zeros and current/mid values
                 _homePanDeg = 0f;
                 _homeTiltDeg = 0f;
-                _homeFovDeg = Clamp(CurrentFovDeg == 0 ? 60f : CurrentFovDeg, MinFov, MaxFov);
+                _homeFovDeg = PtzMathUtils.Clamp(CurrentFovDeg == 0 ? 60f : CurrentFovDeg, MinFov, MaxFov);
                 _homeFocus = CurrentFocus;
                 _homeIris = CurrentIris;
                 _hasHome = true;
@@ -206,60 +261,13 @@ namespace ViscaControlVirtualCam
             _omegaIris = 0f;
         }
 
-        // Blackmagic PTZ Control: Zoom Direct
-        public void CommandZoomDirect(ushort zoomPos)
-        {
-            var fov = Lerp(MinFov, MaxFov, zoomPos / 65535f);
-            _targetFov = fov;
-            _omegaFov = 0f;
-        }
+        #endregion
 
-        // Blackmagic PTZ Control: Focus Variable
-        public void CommandFocusVariable(byte focusSpeed)
-        {
-            if (focusSpeed == 0x00)
-            {
-                _omegaFocus = 0f;
-                return;
-            }
+        #region Memory Commands
 
-            // 0x02 = Far, 0x03 = Near
-            var sign = focusSpeed == 0x02 ? 1f : -1f;
-            _omegaFocus = FocusMaxSpeed * sign;
-        }
-
-        // Blackmagic PTZ Control: Focus Direct
-        public void CommandFocusDirect(ushort focusPos)
-        {
-            _targetFocus = focusPos;
-            _omegaFocus = 0f;
-        }
-
-        // Blackmagic PTZ Control: Iris Variable
-        public void CommandIrisVariable(byte irisDir)
-        {
-            if (irisDir == 0x00)
-            {
-                _omegaIris = 0f;
-                return;
-            }
-
-            // 0x02 = Open, 0x03 = Close
-            var sign = irisDir == 0x02 ? 1f : -1f;
-            _omegaIris = IrisMaxSpeed * sign;
-        }
-
-        // Blackmagic PTZ Control: Iris Direct
-        public void CommandIrisDirect(ushort irisPos)
-        {
-            _targetIris = irisPos;
-            _omegaIris = 0f;
-        }
-
-        // Blackmagic PTZ Control: Memory Recall
         public void CommandMemoryRecall(byte memoryNumber)
         {
-            if (_memoryPresets.TryGetValue(memoryNumber, out var preset))
+            if (_memoryManager.TryGetPreset(memoryNumber, out var preset))
             {
                 _targetPanDeg = preset.PanDeg;
                 _targetTiltDeg = preset.TiltDeg;
@@ -274,239 +282,114 @@ namespace ViscaControlVirtualCam
             }
         }
 
-        // Blackmagic PTZ Control: Memory Set
         public void CommandMemorySet(byte memoryNumber)
         {
-            var preset = new PtzMemoryPreset
-            {
-                PanDeg = CurrentPanDeg,
-                TiltDeg = CurrentTiltDeg,
-                FovDeg = CurrentFovDeg,
-                FocusPos = CurrentFocus,
-                IrisPos = CurrentIris
-            };
-            _memoryPresets[memoryNumber] = preset;
-
-            // Save to PlayerPrefs if available
-            SavePreset(memoryNumber, preset);
+            _memoryManager.SavePreset(memoryNumber, CurrentPanDeg, CurrentTiltDeg, CurrentFovDeg, CurrentFocus,
+                CurrentIris);
         }
 
-        /// <summary>
-        ///     Save a preset to PlayerPrefs
-        /// </summary>
-        private void SavePreset(byte memoryNumber, PtzMemoryPreset preset)
-        {
-            if (_playerPrefs == null) return;
-
-            var key = $"{_prefsKeyPrefix}Mem{memoryNumber}_";
-            _playerPrefs.SetFloat(key + "Pan", preset.PanDeg);
-            _playerPrefs.SetFloat(key + "Tilt", preset.TiltDeg);
-            _playerPrefs.SetFloat(key + "Fov", preset.FovDeg);
-            _playerPrefs.SetFloat(key + "Focus", preset.FocusPos);
-            _playerPrefs.SetFloat(key + "Iris", preset.IrisPos);
-            _playerPrefs.Save();
-        }
-
-        /// <summary>
-        ///     Load a preset from PlayerPrefs
-        /// </summary>
-        private bool LoadPreset(byte memoryNumber, out PtzMemoryPreset preset)
-        {
-            preset = default;
-            if (_playerPrefs == null) return false;
-
-            var key = $"{_prefsKeyPrefix}Mem{memoryNumber}_";
-            if (!_playerPrefs.HasKey(key + "Pan")) return false;
-
-            preset = new PtzMemoryPreset
-            {
-                PanDeg = _playerPrefs.GetFloat(key + "Pan", 0f),
-                TiltDeg = _playerPrefs.GetFloat(key + "Tilt", 0f),
-                FovDeg = _playerPrefs.GetFloat(key + "Fov", 60f),
-                FocusPos = _playerPrefs.GetFloat(key + "Focus", 0f),
-                IrisPos = _playerPrefs.GetFloat(key + "Iris", 0f)
-            };
-            return true;
-        }
-
-        /// <summary>
-        ///     Load all presets from PlayerPrefs
-        /// </summary>
-        private void LoadAllPresets()
-        {
-            if (_playerPrefs == null) return;
-
-            // Load presets 0-9 (common range for PTZ cameras)
-            for (byte i = 0; i < 10; i++)
-                if (LoadPreset(i, out var preset))
-                    _memoryPresets[i] = preset;
-        }
-
-        /// <summary>
-        ///     Delete a preset from memory and PlayerPrefs
-        /// </summary>
         public void DeletePreset(byte memoryNumber)
         {
-            _memoryPresets.Remove(memoryNumber);
-
-            if (_playerPrefs == null) return;
-
-            var key = $"{_prefsKeyPrefix}Mem{memoryNumber}_";
-            _playerPrefs.DeleteKey(key + "Pan");
-            _playerPrefs.DeleteKey(key + "Tilt");
-            _playerPrefs.DeleteKey(key + "Fov");
-            _playerPrefs.DeleteKey(key + "Focus");
-            _playerPrefs.DeleteKey(key + "Iris");
-            _playerPrefs.Save();
+            _memoryManager.DeletePreset(memoryNumber);
         }
 
-        /// <summary>
-        ///     Get all saved preset numbers
-        /// </summary>
         public IEnumerable<byte> GetSavedPresets()
         {
-            return _memoryPresets.Keys;
+            return _memoryManager.GetSavedPresets();
         }
+
+        #endregion
+
+        #region Step Update
 
         public PtzStepResult Step(float currentYawDeg, float currentPitchDeg, float currentFovDeg, float dt)
         {
-            // Update current state for memory operations
             CurrentPanDeg = currentYawDeg;
             CurrentTiltDeg = currentPitchDeg;
             CurrentFovDeg = currentFovDeg;
 
             var result = new PtzStepResult();
 
-            // Velocity drive
+            // Calculate velocities with optional acceleration limiting
             var panVel = _omegaPan;
             var tiltVel = _omegaTilt;
             var fovVel = _omegaFov;
 
             if (UseAccelerationLimit)
             {
-                panVel = MoveTowards(_omegaPanCurrent, _omegaPan, PanAccelDegPerSec2 * dt);
-                tiltVel = MoveTowards(_omegaTiltCurrent, _omegaTilt, TiltAccelDegPerSec2 * dt);
-                fovVel = MoveTowards(_omegaFovCurrent, _omegaFov, ZoomAccelDegPerSec2 * dt);
+                panVel = PtzMathUtils.MoveTowards(_omegaPanCurrent, _omegaPan, PanAccelDegPerSec2 * dt);
+                tiltVel = PtzMathUtils.MoveTowards(_omegaTiltCurrent, _omegaTilt, TiltAccelDegPerSec2 * dt);
+                fovVel = PtzMathUtils.MoveTowards(_omegaFovCurrent, _omegaFov, ZoomAccelDegPerSec2 * dt);
 
                 _omegaPanCurrent = panVel;
                 _omegaTiltCurrent = tiltVel;
                 _omegaFovCurrent = fovVel;
             }
 
+            // Apply velocity
             result.DeltaYawDeg += panVel * dt;
             result.DeltaPitchDeg += tiltVel * dt;
 
-            // Absolute with damping
+            // Apply absolute positioning with damping
             if (_targetPanDeg.HasValue)
             {
-                var targetYaw = Clamp(_targetPanDeg.Value, PanMinDeg, PanMaxDeg);
-                var newYaw = Damp(currentYawDeg, targetYaw, MoveDamping, dt);
-                var delta = DeltaAngle(currentYawDeg, newYaw);
+                var targetYaw = PtzMathUtils.Clamp(_targetPanDeg.Value, PanMinDeg, PanMaxDeg);
+                var newYaw = PtzMathUtils.Damp(currentYawDeg, targetYaw, MoveDamping, dt);
+                var delta = PtzMathUtils.DeltaAngle(currentYawDeg, newYaw);
                 result.DeltaYawDeg += delta;
-                if (Math.Abs(DeltaAngle(newYaw, targetYaw)) < 0.1f) _targetPanDeg = null;
+                if (Math.Abs(PtzMathUtils.DeltaAngle(newYaw, targetYaw)) < 0.1f) _targetPanDeg = null;
             }
 
             if (_targetTiltDeg.HasValue)
             {
-                var targetPitch = Clamp(_targetTiltDeg.Value, TiltMinDeg, TiltMaxDeg);
-                var newPitch = Damp(currentPitchDeg, targetPitch, MoveDamping, dt);
+                var targetPitch = PtzMathUtils.Clamp(_targetTiltDeg.Value, TiltMinDeg, TiltMaxDeg);
+                var newPitch = PtzMathUtils.Damp(currentPitchDeg, targetPitch, MoveDamping, dt);
                 var delta = newPitch - currentPitchDeg;
                 result.DeltaPitchDeg += delta;
                 if (Math.Abs(newPitch - targetPitch) < 0.1f) _targetTiltDeg = null;
             }
 
-            // Zoom
+            // Zoom/FOV
             var newFov = currentFovDeg + fovVel * dt;
             if (_targetFov.HasValue)
             {
-                var targetFov = Clamp(_targetFov.Value, MinFov, MaxFov);
-                newFov = Damp(currentFovDeg, targetFov, MoveDamping, dt);
+                var targetFov = PtzMathUtils.Clamp(_targetFov.Value, MinFov, MaxFov);
+                newFov = PtzMathUtils.Damp(currentFovDeg, targetFov, MoveDamping, dt);
                 if (Math.Abs(newFov - targetFov) < 0.1f) _targetFov = null;
             }
 
-            newFov = Clamp(newFov, MinFov, MaxFov);
+            newFov = PtzMathUtils.Clamp(newFov, MinFov, MaxFov);
             if (Math.Abs(newFov - currentFovDeg) > 1e-4f)
             {
                 result.NewFovDeg = newFov;
                 result.HasNewFov = true;
             }
 
-            // Focus (Blackmagic PTZ Control)
+            // Focus
             CurrentFocus += _omegaFocus * dt;
             if (_targetFocus.HasValue)
             {
-                var targetFocus = Clamp(_targetFocus.Value, FocusMin, FocusMax);
-                CurrentFocus = Damp(CurrentFocus, targetFocus, MoveDamping, dt);
+                var targetFocus = PtzMathUtils.Clamp(_targetFocus.Value, FocusMin, FocusMax);
+                CurrentFocus = PtzMathUtils.Damp(CurrentFocus, targetFocus, MoveDamping, dt);
                 if (Math.Abs(CurrentFocus - targetFocus) < 1f) _targetFocus = null;
             }
 
-            CurrentFocus = Clamp(CurrentFocus, FocusMin, FocusMax);
+            CurrentFocus = PtzMathUtils.Clamp(CurrentFocus, FocusMin, FocusMax);
 
-            // Iris (Blackmagic PTZ Control)
+            // Iris
             CurrentIris += _omegaIris * dt;
             if (_targetIris.HasValue)
             {
-                var targetIris = Clamp(_targetIris.Value, IrisMin, IrisMax);
-                CurrentIris = Damp(CurrentIris, targetIris, MoveDamping, dt);
+                var targetIris = PtzMathUtils.Clamp(_targetIris.Value, IrisMin, IrisMax);
+                CurrentIris = PtzMathUtils.Damp(CurrentIris, targetIris, MoveDamping, dt);
                 if (Math.Abs(CurrentIris - targetIris) < 1f) _targetIris = null;
             }
 
-            CurrentIris = Clamp(CurrentIris, IrisMin, IrisMax);
+            CurrentIris = PtzMathUtils.Clamp(CurrentIris, IrisMin, IrisMax);
 
             return result;
         }
 
-        private static float MapSpeed(byte v, byte vmin, byte vmax, float maxDegPerSec, float gamma)
-        {
-            if (v == 0x00) v = vmin;
-            var t = SafeInverseLerp(vmin, vmax, Clamp(v, vmin, vmax));
-            var mapped = (float)Math.Pow(t, Math.Max(0.01f, gamma));
-            return mapped * maxDegPerSec;
-        }
-
-        private static float Damp(float current, float target, float damping, float dt)
-        {
-            var k = 1f - (float)Math.Exp(-damping * dt);
-            return current + (target - current) * k;
-        }
-
-        private static float Lerp(float a, float b, float t)
-        {
-            return a + (b - a) * t;
-        }
-
-        /// <summary>
-        ///     Safe inverse lerp that handles equal min/max (returns 0.5 instead of NaN/Infinity).
-        /// </summary>
-        private static float SafeInverseLerp(float a, float b, float v)
-        {
-            var range = b - a;
-            if (Math.Abs(range) < ViscaProtocol.DivisionEpsilon) return 0.5f;
-            return (v - a) / range;
-        }
-
-        private static float Clamp(float v, float min, float max)
-        {
-            return v < min ? min : v > max ? max : v;
-        }
-
-        private static int Clamp(int v, int min, int max)
-        {
-            return v < min ? min : v > max ? max : v;
-        }
-
-        private static float DeltaAngle(float a, float b)
-        {
-            var diff = (b - a) % 360f;
-            if (diff > 180f) diff -= 360f;
-            if (diff < -180f) diff += 360f;
-            return diff;
-        }
-
-        private static float MoveTowards(float current, float target, float maxDelta)
-        {
-            if (Math.Abs(target - current) <= maxDelta) return target;
-            return current + Math.Sign(target - current) * maxDelta;
-        }
+        #endregion
     }
 }
