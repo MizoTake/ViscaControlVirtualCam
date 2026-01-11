@@ -17,6 +17,7 @@ namespace ViscaControlVirtualCam
         private readonly ViscaReplyMode _replyMode;
         private byte _focusMode = ViscaProtocol.FocusModeManual;
         private int _pendingOperations;
+        private int _cancelGeneration;
 
         public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode,
             Action<string> logger = null, int maxPendingOperations = 64)
@@ -287,6 +288,7 @@ namespace ViscaControlVirtualCam
         {
             // Always acknowledge cancel as CommandCanceled per spec, even if nothing is pending
             Interlocked.Exchange(ref _pendingOperations, 0); // best-effort clear any pending work
+            Interlocked.Increment(ref _cancelGeneration); // suppress completions from earlier enqueued commands
             ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandCancelled, ctx.SocketId);
             return true;
         }
@@ -301,6 +303,7 @@ namespace ViscaControlVirtualCam
 
             var responder = ctx.Responder;
             var socketId = ctx.SocketId;
+            var generation = _cancelGeneration;
 
             Interlocked.Increment(ref _pendingOperations);
             _mainThreadDispatcher(() =>
@@ -319,7 +322,8 @@ namespace ViscaControlVirtualCam
                 finally
                 {
                     Interlocked.Decrement(ref _pendingOperations);
-                    if (shouldComplete) ViscaResponse.SendCompletion(responder, _replyMode, socketId);
+                    if (shouldComplete && generation == _cancelGeneration)
+                        ViscaResponse.SendCompletion(responder, _replyMode, socketId);
                 }
             });
 

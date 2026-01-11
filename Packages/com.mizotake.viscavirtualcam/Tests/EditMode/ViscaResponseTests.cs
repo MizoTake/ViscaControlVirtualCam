@@ -89,6 +89,32 @@ public class ViscaResponseTests
         CollectionAssert.AreEqual(new byte[] { 0x90, 0x61, 0x04, 0xFF }, sent);
     }
 
+    [Test]
+    public void CommandCancel_SuppressesCompletionOfPendingActions()
+    {
+        var model = new PtzModel();
+        var sent = new System.Collections.Generic.List<byte[]>();
+        var actions = new System.Collections.Generic.List<Action>();
+        var handler = new PtzViscaHandler(model, a => actions.Add(a), ViscaReplyMode.AckAndCompletion, _ => { });
+
+        var moveCtx = ViscaCommandContext.PanTiltDrive(
+            new byte[] { 0x85, 0x01, 0x06, 0x01, 0x10, 0x10, 0x02, 0x02, 0xFF },
+            b => sent.Add(b),
+            0x10, 0x10, 0x02, 0x02);
+
+        handler.Handle(in moveCtx); // enqueues action, sends ACK
+
+        var cancelCtx = ViscaCommandContext.CommandCancel(new byte[] { 0x85, 0x23, 0xFF }, b => sent.Add(b));
+        handler.Handle(in cancelCtx); // sends cancel
+
+        // Execute pending action after cancel; completion should be suppressed
+        foreach (var act in actions) act();
+
+        Assert.AreEqual(2, sent.Count, "Only ACK and Cancel should be sent");
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x45, 0xFF }, sent[0]);
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x63, 0x04, 0xFF }, sent[1]);
+    }
+
     private sealed class CapturingHandler : IViscaCommandHandler
     {
         public ViscaCommandContext? LastContext;

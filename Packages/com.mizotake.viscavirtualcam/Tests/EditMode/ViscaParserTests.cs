@@ -1,14 +1,17 @@
+using System;
 using NUnit.Framework;
 using ViscaControlVirtualCam;
 
 public class ViscaParserTests
 {
     private ViscaCommandRegistry _registry;
+    private CapturingHandler _handler;
 
     [SetUp]
     public void Setup()
     {
         _registry = new ViscaCommandRegistry();
+        _handler = new CapturingHandler();
     }
 
     [Test]
@@ -51,6 +54,36 @@ public class ViscaParserTests
         Assert.AreEqual(0x0800, tilt);
     }
 
+    [Test]
+    public void Parse_PanTiltAbsolute_Speedless_TryExecute_SetsZeroSpeeds()
+    {
+        var frame = new byte[] { 0x85, 0x01, 0x06, 0x02, 0x00, 0x08, 0x00, 0x01, 0x00, 0x08, 0x00, 0x02, 0xFF };
+
+        var ctx = _registry.TryExecute(frame, _handler, _ => { });
+
+        Assert.IsTrue(ctx.HasValue);
+        Assert.AreEqual(ViscaCommandType.PanTiltAbsolute, _handler.LastContext?.CommandType);
+        Assert.AreEqual(0x00, _handler.LastContext?.PanSpeed);
+        Assert.AreEqual(0x00, _handler.LastContext?.TiltSpeed);
+        Assert.AreEqual(0x0801, _handler.LastContext?.PanPosition);
+        Assert.AreEqual(0x0802, _handler.LastContext?.TiltPosition);
+    }
+
+    private sealed class CapturingHandler : IViscaCommandHandler
+    {
+        public ViscaCommandContext? LastContext;
+
+        public bool Handle(in ViscaCommandContext context)
+        {
+            LastContext = context;
+            return true;
+        }
+
+        public void HandleError(byte[] frame, Action<byte[]> responder, byte errorCode)
+        {
+            // Not needed for these tests
+        }
+    }
     // Blackmagic PTZ Control Tests
     [Test]
     public void Parse_ZoomDirect_Works()
