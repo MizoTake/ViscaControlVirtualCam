@@ -295,17 +295,18 @@ namespace ViscaControlVirtualCam
 
         private bool TryEnqueue(ViscaCommandContext ctx, Action action)
         {
-            if (_pendingOperations >= _maxPendingOperations)
-            {
-                ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandBuffer, ctx.SocketId);
-                return false;
-            }
-
             var responder = ctx.Responder;
             var socketId = ctx.SocketId;
             var generation = _cancelGeneration;
 
-            Interlocked.Increment(ref _pendingOperations);
+            var newCount = Interlocked.Increment(ref _pendingOperations);
+            if (newCount > _maxPendingOperations)
+            {
+                Interlocked.Decrement(ref _pendingOperations);
+                ViscaResponse.SendError(responder, ViscaProtocol.ErrorCommandBuffer, socketId);
+                return false;
+            }
+
             _mainThreadDispatcher(() =>
             {
                 var shouldComplete = true;

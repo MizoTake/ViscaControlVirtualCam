@@ -98,6 +98,14 @@ namespace ViscaControlVirtualCam
 
             _udp = null;
             _tcp = null;
+            try
+            {
+                _cts?.Dispose();
+            }
+            catch (Exception e)
+            {
+                Log($"CTS dispose error: {e.Message}");
+            }
             _cts = null;
             foreach (var kv in _clients)
                 try
@@ -213,8 +221,9 @@ namespace ViscaControlVirtualCam
                         {
                             client.Close();
                         }
-                        catch
+                        catch (Exception ex)
                         {
+                            Log($"TCP client close error: {ex.Message}");
                         }
 
                         continue;
