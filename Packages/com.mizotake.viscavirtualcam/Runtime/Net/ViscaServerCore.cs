@@ -273,8 +273,9 @@ namespace ViscaControlVirtualCam
                     {
                         n = stream.Read(buffer, 0, buffer.Length);
                     }
-                    catch
+                    catch (Exception e)
                     {
+                        Log($"TCP read error: {e.Message}");
                         break;
                     }
 
