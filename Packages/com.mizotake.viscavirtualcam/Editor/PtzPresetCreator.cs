@@ -10,7 +10,7 @@ namespace ViscaControlVirtualCam.Editor
     {
         private const string PresetDir = "Assets/ViscaControlVirtualCamera/Presets";
 
-        [MenuItem("Tools/Visca/Create PTZ Presets (Indoor Outdoor Fast)", priority = 12)]
+        [MenuItem("Tools/Visca/Create PTZ Presets (Indoor Outdoor Fast BRC-X400)", priority = 12)]
         public static void CreatePresets()
         {
             if (!Directory.Exists(PresetDir)) Directory.CreateDirectory(PresetDir);
@@ -41,6 +41,36 @@ namespace ViscaControlVirtualCam.Editor
                 s.maxFov = 100f;
                 s.speedGamma = 0.9f;
             });
+            CreatePreset("PTZ_BRC-X400.asset", s =>
+            {
+                s.panMaxDegPerSec = 300f;
+                s.tiltMaxDegPerSec = 126f;
+                s.zoomMaxFovPerSec = 25f;
+                s.minFov = 3.5f;
+                s.maxFov = 70f;
+                s.panMinDeg = -170f;
+                s.panMaxDeg = 170f;
+                s.tiltMinDeg = -20f;
+                s.tiltMaxDeg = 90f;
+                s.speedGamma = 1.0f;
+                s.enablePanTiltSpeedScaleByZoom = true;
+                s.panTiltSpeedScaleAtTele = 0.5f;
+            });
+
+            CreateTuningPreset("PTZ_Tuning_BRC-X400.asset", t =>
+            {
+                t.enableAccelerationLimit = true;
+                t.panAccelDegPerSec2 = 800f;
+                t.tiltAccelDegPerSec2 = 600f;
+                t.zoomAccelDegPerSec2 = 300f;
+                t.panDecelDegPerSec2 = 900f;
+                t.tiltDecelDegPerSec2 = 700f;
+                t.zoomDecelDegPerSec2 = 350f;
+                t.enableTargetBraking = true;
+                t.panStopDistanceDeg = 0.2f;
+                t.tiltStopDistanceDeg = 0.2f;
+                t.zoomStopDistanceDeg = 0.15f;
+            });
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             EditorUtility.DisplayDialog("PTZ Presets", $"Created/Updated presets under:\n{PresetDir}", "OK");
@@ -59,6 +89,21 @@ namespace ViscaControlVirtualCam.Editor
 
             configure(settings);
             EditorUtility.SetDirty(settings);
+        }
+
+        private static void CreateTuningPreset(string name, Action<PtzTuningProfile> configure)
+        {
+            var path = Path.Combine(PresetDir, name);
+            PtzTuningProfile profile = null;
+            if (File.Exists(path)) profile = AssetDatabase.LoadAssetAtPath<PtzTuningProfile>(path);
+            if (profile == null)
+            {
+                profile = ScriptableObject.CreateInstance<PtzTuningProfile>();
+                AssetDatabase.CreateAsset(profile, path);
+            }
+
+            configure(profile);
+            EditorUtility.SetDirty(profile);
         }
     }
 }

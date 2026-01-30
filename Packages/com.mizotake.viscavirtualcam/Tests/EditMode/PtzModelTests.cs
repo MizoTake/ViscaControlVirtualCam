@@ -86,6 +86,54 @@ public class PtzModelTests
     }
 
     [Test]
+    public void AbsoluteMove_TargetBraking_RespectsSpeedLimit()
+    {
+        var m = new PtzModel
+        {
+            PanMaxDegPerSec = 120f,
+            PanVmin = 0x01,
+            PanVmax = 0x18,
+            SpeedGamma = 1.0f,
+            UseTargetBraking = true,
+            PanDecelDegPerSec2 = 0f,
+            PanStopDistanceDeg = 0f,
+            UseAccelerationLimit = false
+        };
+
+        m.CommandPanTiltAbsolute(0x01, 0x01, 0xFFFF, 0x8000);
+        var expected = PtzMathUtils.MapSpeed(0x01, m.PanVmin, m.PanVmax, m.PanMaxDegPerSec, m.SpeedGamma);
+        var step = m.Step(0f, 0f, 60f, 0.1f);
+
+        Assert.That(step.DeltaYawDeg, Is.EqualTo(expected * 0.1f).Within(0.01f));
+    }
+
+    [Test]
+    public void PanTiltSpeed_IsScaled_ByZoom()
+    {
+        var m = new PtzModel
+        {
+            PanMaxDegPerSec = 100f,
+            TiltMaxDegPerSec = 100f,
+            SpeedGamma = 1.0f,
+            PanVmin = 0x01,
+            PanVmax = 0x18,
+            TiltVmin = 0x01,
+            TiltVmax = 0x14,
+            EnablePanTiltSpeedScaleByZoom = true,
+            PanTiltSpeedScaleAtTele = 0.5f,
+            MinFov = 15f,
+            MaxFov = 90f,
+            UseAccelerationLimit = false
+        };
+
+        m.CommandPanTiltVariable(0x18, 0x18, AxisDirection.Positive, AxisDirection.Positive);
+        var expected = PtzMathUtils.MapSpeed(0x18, m.PanVmin, m.PanVmax, m.PanMaxDegPerSec, m.SpeedGamma);
+        var step = m.Step(0f, 0f, 15f, 0.1f);
+
+        Assert.That(step.DeltaYawDeg, Is.EqualTo(expected * 0.1f * 0.5f).Within(0.01f));
+    }
+
+    [Test]
     public void MemorySet_SavesPreset()
     {
         var prefs = new MockPlayerPrefsAdapter();
