@@ -228,6 +228,13 @@ public class PtzMathUtilsTests
     }
 
     [Test]
+    public void MapSpeed_MinSpeedFloor_IsApplied()
+    {
+        var result = PtzMathUtils.MapSpeed(0x01, 0x01, 0x18, 0.5f, 120f, 1f);
+        Assert.AreEqual(0.5f, result, 0.0001f);
+    }
+
+    [Test]
     public void MapSpeed_MidSpeed_ReturnsPositive()
     {
         // Mid-range speed should return positive value

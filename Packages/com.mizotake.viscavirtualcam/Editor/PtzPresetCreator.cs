@@ -43,11 +43,17 @@ namespace ViscaControlVirtualCam.Editor
             });
             CreatePreset("PTZ_BRC-X400.asset", s =>
             {
-                s.panMaxDegPerSec = 300f;
-                s.tiltMaxDegPerSec = 126f;
+                s.panMaxDegPerSec = 101f;
+                s.tiltMaxDegPerSec = 91f;
+                s.panMinDegPerSec = 0.5f;
+                s.tiltMinDegPerSec = 0.5f;
+                s.panPresetMaxDegPerSec = 300f;
+                s.tiltPresetMaxDegPerSec = 126f;
+                s.panPresetMinDegPerSec = 1.1f;
+                s.tiltPresetMinDegPerSec = 1.1f;
                 s.zoomMaxFovPerSec = 25f;
-                s.minFov = 3.5f;
-                s.maxFov = 70f;
+                s.minFov = 2.1f;
+                s.maxFov = 40.4f;
                 s.panMinDeg = -170f;
                 s.panMaxDeg = 170f;
                 s.tiltMinDeg = -20f;
@@ -55,6 +61,17 @@ namespace ViscaControlVirtualCam.Editor
                 s.speedGamma = 1.0f;
                 s.enablePanTiltSpeedScaleByZoom = true;
                 s.panTiltSpeedScaleAtTele = 0.5f;
+                s.useSlowPanTilt = false;
+                s.panSlowMaxDegPerSec = 60f;
+                s.tiltSlowMaxDegPerSec = 60f;
+                s.panSlowMinDegPerSec = 0.5f;
+                s.tiltSlowMinDegPerSec = 0.5f;
+                s.useLensProfile = true;
+                s.sensorWidthMm = 5.76f;
+                s.sensorHeightMm = 3.24f;
+                s.focalLengthMinMm = 4.4f;
+                s.focalLengthMaxMm = 88.0f;
+                s.zoomPositionTeleAtMax = true;
             });
 
             CreateTuningPreset("PTZ_Tuning_BRC-X400.asset", t =>

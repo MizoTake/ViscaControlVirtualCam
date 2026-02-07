@@ -15,6 +15,25 @@ namespace ViscaControlVirtualCam
         [Tooltip("ズーム(FOV)の最大速度(度/秒)")]
         public float zoomMaxFovPerSec = 40f;
 
+        [Header("速度下限/プリセット速度")]
+        [Tooltip("パンの最小速度(度/秒)")]
+        public float panMinDegPerSec = 0f;
+
+        [Tooltip("チルトの最小速度(度/秒)")]
+        public float tiltMinDegPerSec = 0f;
+
+        [Tooltip("プリセット呼出し時のパン最大速度(度/秒)")]
+        public float panPresetMaxDegPerSec = 0f;
+
+        [Tooltip("プリセット呼出し時のチルト最大速度(度/秒)")]
+        public float tiltPresetMaxDegPerSec = 0f;
+
+        [Tooltip("プリセット呼出し時のパン最小速度(度/秒)")]
+        public float panPresetMinDegPerSec = 0f;
+
+        [Tooltip("プリセット呼出し時のチルト最小速度(度/秒)")]
+        public float tiltPresetMinDegPerSec = 0f;
+
         [Tooltip("FOVの最小値(望遠側)")]
         public float minFov = 15f;
 
@@ -61,6 +80,22 @@ namespace ViscaControlVirtualCam
         [Tooltip("チルトの絶対位置マッピングを反転する")]
         public bool invertTiltAbsolute;
 
+        [Header("スローパン/チルト")]
+        [Tooltip("スローパン/チルトモードを使用する")]
+        public bool useSlowPanTilt = false;
+
+        [Tooltip("スローパン時のパン最大速度(度/秒)")]
+        public float panSlowMaxDegPerSec = 60f;
+
+        [Tooltip("スローパン時のチルト最大速度(度/秒)")]
+        public float tiltSlowMaxDegPerSec = 60f;
+
+        [Tooltip("スローパン時のパン最小速度(度/秒)")]
+        public float panSlowMinDegPerSec = 0f;
+
+        [Tooltip("スローパン時のチルト最小速度(度/秒)")]
+        public float tiltSlowMinDegPerSec = 0f;
+
         [Header("ズーム連動")]
         [Tooltip("望遠時にパン/チルト速度を抑える")]
         public bool enablePanTiltSpeedScaleByZoom = false;
@@ -69,6 +104,25 @@ namespace ViscaControlVirtualCam
         [Range(0.1f, 1.0f)]
         public float panTiltSpeedScaleAtTele = 0.6f;
 
+        [Header("レンズプロファイル")]
+        [Tooltip("ズーム位置からFOVをレンズ仕様で算出する")]
+        public bool useLensProfile = false;
+
+        [Tooltip("センサー幅(mm)")]
+        public float sensorWidthMm = 0f;
+
+        [Tooltip("センサー高(mm)")]
+        public float sensorHeightMm = 0f;
+
+        [Tooltip("焦点距離最小(mm)")]
+        public float focalLengthMinMm = 0f;
+
+        [Tooltip("焦点距離最大(mm)")]
+        public float focalLengthMaxMm = 0f;
+
+        [Tooltip("ズーム位置の最大値を望遠側として扱う")]
+        public bool zoomPositionTeleAtMax = true;
+
         public void ApplyTo(PtzModel model)
         {
             if (model == null) return;
@@ -76,6 +130,12 @@ namespace ViscaControlVirtualCam
             model.PanMaxDegPerSec = panMaxDegPerSec;
             model.TiltMaxDegPerSec = tiltMaxDegPerSec;
             model.ZoomMaxFovPerSec = zoomMaxFovPerSec;
+            model.PanMinDegPerSec = panMinDegPerSec;
+            model.TiltMinDegPerSec = tiltMinDegPerSec;
+            model.PanPresetMaxDegPerSec = panPresetMaxDegPerSec;
+            model.TiltPresetMaxDegPerSec = tiltPresetMaxDegPerSec;
+            model.PanPresetMinDegPerSec = panPresetMinDegPerSec;
+            model.TiltPresetMinDegPerSec = tiltPresetMinDegPerSec;
             model.MinFov = minFov;
             model.MaxFov = maxFov;
             model.PanMinDeg = panMinDeg;
@@ -92,8 +152,19 @@ namespace ViscaControlVirtualCam
             model.InvertTilt = invertTilt;
             model.InvertPanAbsolute = invertPanAbsolute;
             model.InvertTiltAbsolute = invertTiltAbsolute;
+            model.UseSlowPanTilt = useSlowPanTilt;
+            model.PanSlowMaxDegPerSec = panSlowMaxDegPerSec;
+            model.TiltSlowMaxDegPerSec = tiltSlowMaxDegPerSec;
+            model.PanSlowMinDegPerSec = panSlowMinDegPerSec;
+            model.TiltSlowMinDegPerSec = tiltSlowMinDegPerSec;
             model.EnablePanTiltSpeedScaleByZoom = enablePanTiltSpeedScaleByZoom;
             model.PanTiltSpeedScaleAtTele = panTiltSpeedScaleAtTele;
+            model.UseLensProfile = useLensProfile;
+            model.SensorWidthMm = sensorWidthMm;
+            model.SensorHeightMm = sensorHeightMm;
+            model.FocalLengthMinMm = focalLengthMinMm;
+            model.FocalLengthMaxMm = focalLengthMaxMm;
+            model.ZoomPositionTeleAtMax = zoomPositionTeleAtMax;
         }
     }
 }

@@ -5,6 +5,8 @@
 ## PtzSettings（基本設定）
 
 - **Pan/Tilt/Zoom 最大速度**: 速度の上限です。大きいほど速く動きます。
+- **Pan/Tilt 最小速度**: 速度の下限です。BRC-X400 は通常操作で 0.5°/s が下限です。
+- **プリセット速度**: プリセット呼び出し時の最大/最小速度を分けて設定できます。
 - **FOV最小/最大**: ズーム範囲です。最小が望遠、最大が広角。
 - **絶対位置の可動範囲**: パン/チルトの角度制限。
 - **Move Damping**: 絶対位置移動（従来方式）の減衰係数。大きいほど早く追従。
@@ -14,6 +16,9 @@
 - **ズーム連動**:
   - **Enable Pan/Tilt Speed Scale By Zoom**: 望遠時にパン/チルト速度を抑える。
   - **Pan/Tilt Speed Scale At Tele**: 望遠端（最小FOV）での速度倍率。
+- **スローパン/チルト**: 低速モードの最大/最小速度を設定します。
+- **レンズプロファイル**: センサーサイズと焦点距離からFOVを算出します（Unityは垂直FOV）。
+- **ズーム位置マッピング**: `zoomPositionTeleAtMax` がオンの場合、ズーム位置の最大値を望遠側として扱います。
 
 ## PtzTuningProfile（詳細調整）
 
@@ -39,15 +44,23 @@
 `Tools > Visca > Create PTZ Presets (Indoor Outdoor Fast BRC-X400)` で以下のプリセットが生成されます。
 
 ### PTZ_BRC-X400（PtzSettings）
-- Pan Max: 300 deg/s
-- Tilt Max: 126 deg/s
+- Pan Max (Normal): 101 deg/s
+- Tilt Max (Normal): 91 deg/s
+- Pan Min (Normal): 0.5 deg/s
+- Tilt Min (Normal): 0.5 deg/s
+- Pan Max (Preset): 300 deg/s
+- Tilt Max (Preset): 126 deg/s
+- Pan Min (Preset): 1.1 deg/s
+- Tilt Min (Preset): 1.1 deg/s
 - Pan Range: -170 .. 170 deg
 - Tilt Range: -20 .. 90 deg
-- FOV Range: 3.5 .. 70 deg
+- FOV Range (Vertical): 2.1 .. 40.4 deg
 - Zoom Max FOV Speed: 25 deg/s
 - ズーム連動パン/チルト速度: Teleで0.5x
+- レンズ: 1/2.5型センサー(5.76x3.24mm), f=4.4..88.0mm
+- スローパン/チルト: 0.5..60 deg/s
 
-※FOV最小値・ズーム速度は公開仕様からの推定値です。必要に応じて調整してください。
+※ズーム速度は公開仕様からの推定値です。必要に応じて調整してください。
 
 ### PTZ_Tuning_BRC-X400（PtzTuningProfile）
 - 加速度: Pan 800 / Tilt 600 / Zoom 300 (deg/s^2)

@@ -54,6 +54,24 @@ public class PtzModelTests
     }
 
     [Test]
+    public void PanTiltDrive_UsesMinSpeedFloor()
+    {
+        var m = new PtzModel
+        {
+            PanMaxDegPerSec = 100f,
+            PanMinDegPerSec = 0.5f,
+            SpeedGamma = 1.0f,
+            PanVmin = 0x01,
+            PanVmax = 0x18,
+            UseAccelerationLimit = false
+        };
+        m.CommandPanTiltVariable(0x01, 0x01, AxisDirection.Positive, AxisDirection.Stop);
+        var step = m.Step(0f, 0f, 60f, 1.0f);
+
+        Assert.That(step.DeltaYawDeg, Is.EqualTo(0.5f).Within(0.01f));
+    }
+
+    [Test]
     public void Zoom_Tele_DecreasesFov()
     {
         var m = new PtzModel { ZoomMaxFovPerSec = 40f, MinFov = 15f, MaxFov = 90f, SpeedGamma = 1.0f };
@@ -182,6 +200,67 @@ public class PtzModelTests
         Assert.That(yaw, Is.InRange(9f, 11f), "Pan should reach preset value");
         Assert.That(pitch, Is.InRange(19f, 21f), "Tilt should reach preset value");
         Assert.That(fov, Is.InRange(44f, 46f), "FOV should reach preset value");
+    }
+
+    [Test]
+    public void MemoryRecall_UsesPresetMaxSpeedLimit()
+    {
+        var prefs = new MockPlayerPrefsAdapter();
+        var m = new PtzModel(prefs, "Test_")
+        {
+            UseTargetBraking = true,
+            PanDecelDegPerSec2 = 0f,
+            PanStopDistanceDeg = 0f,
+            UseAccelerationLimit = false,
+            PanMaxDegPerSec = 10f,
+            PanPresetMaxDegPerSec = 30f
+        };
+
+        m.Step(90f, 0f, 60f, 0.01f);
+        m.CommandMemorySet(1);
+
+        m.Step(0f, 0f, 60f, 0.01f);
+        m.CommandMemoryRecall(1);
+
+        var step = m.Step(0f, 0f, 60f, 1.0f);
+        Assert.That(step.DeltaYawDeg, Is.EqualTo(30f).Within(0.01f));
+    }
+
+    [Test]
+    public void ZoomPosition_UsesLensProfileForFov()
+    {
+        var m = new PtzModel
+        {
+            UseLensProfile = true,
+            SensorHeightMm = 3.24f,
+            FocalLengthMinMm = 4.4f,
+            FocalLengthMaxMm = 88.0f,
+            ZoomPositionTeleAtMax = true
+        };
+
+        var wideFov = m.GetFovFromZoomPosition(0);
+        var teleFov = m.GetFovFromZoomPosition(65535);
+
+        Assert.Greater(wideFov, teleFov);
+        Assert.That(teleFov, Is.EqualTo(2.11f).Within(0.2f));
+    }
+
+    [Test]
+    public void ZoomInquiry_UsesLensProfileMapping()
+    {
+        var m = new PtzModel
+        {
+            UseLensProfile = true,
+            SensorHeightMm = 3.24f,
+            FocalLengthMinMm = 4.4f,
+            FocalLengthMaxMm = 88.0f,
+            ZoomPositionTeleAtMax = true
+        };
+
+        var teleFov = m.GetFovFromZoomPosition(65535);
+        var zoomPos = m.GetZoomPositionFromFov(teleFov);
+
+        Assert.That(zoomPos, Is.InRange(65534, 65535));
     }
 
     [Test]

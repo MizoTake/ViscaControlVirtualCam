@@ -90,10 +90,19 @@ namespace ViscaControlVirtualCam
         /// <returns>Speed in degrees per second</returns>
         public static float MapSpeed(byte v, byte vmin, byte vmax, float maxDegPerSec, float gamma)
         {
+            return MapSpeed(v, vmin, vmax, 0f, maxDegPerSec, gamma);
+        }
+
+        /// <summary>
+        ///     Map a VISCA speed byte to degrees per second with a minimum speed floor.
+        /// </summary>
+        public static float MapSpeed(byte v, byte vmin, byte vmax, float minDegPerSec, float maxDegPerSec, float gamma)
+        {
             if (v == 0x00) v = vmin;
             var t = SafeInverseLerp(vmin, vmax, Clamp(v, vmin, vmax));
             var mapped = (float)Math.Pow(t, Math.Max(0.01f, gamma));
-            return mapped * maxDegPerSec;
+            var speed = minDegPerSec + (maxDegPerSec - minDegPerSec) * mapped;
+            return speed < 0f ? 0f : speed;
         }
     }
 }

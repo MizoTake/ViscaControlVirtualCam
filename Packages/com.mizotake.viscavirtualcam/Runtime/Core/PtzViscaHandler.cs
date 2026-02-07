@@ -257,15 +257,7 @@ namespace ViscaControlVirtualCam
 
         private bool HandleZoomPositionInquiry(in ViscaCommandContext ctx)
         {
-            var fovRange = _model.MaxFov - _model.MinFov;
-
-            // Avoid division by zero using consistent epsilon
-            var fovNorm = fovRange > ViscaProtocol.DivisionEpsilon
-                ? (_model.CurrentFovDeg - _model.MinFov) / fovRange
-                : 0.5f;
-
-            // Inverted: small FOV = high zoom position
-            var zoomPos = (ushort)((1.0f - Clamp01(fovNorm)) * 65535f);
+            var zoomPos = _model.GetZoomPositionFromFov(_model.CurrentFovDeg);
 
             ViscaResponse.SendInquiryResponse16(ctx.Responder, zoomPos, ctx.SocketId);
             return true;
