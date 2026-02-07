@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88ac303959017ec4b90059a5cf245435, type: 3}
+  m_Name: PTZ_Outdoor
+  m_EditorClassIdentifier: 
+  panMaxDegPerSec: 120
+  tiltMaxDegPerSec: 90
+  zoomMaxFovPerSec: 35
+  panMinDegPerSec: 0
+  tiltMinDegPerSec: 0
+  panPresetMaxDegPerSec: 0
+  tiltPresetMaxDegPerSec: 0
+  panPresetMinDegPerSec: 0
+  tiltPresetMinDegPerSec: 0
+  minFov: 15
+  maxFov: 90
+  panMinDeg: -170
+  panMaxDeg: 170
+  tiltMinDeg: -30
+  tiltMaxDeg: 90
+  moveDamping: 6
+  speedGamma: 1
+  panVmin: 1
+  panVmax: 24
+  tiltVmin: 1
+  tiltVmax: 20
+  invertPan: 0
+  invertTilt: 0
+  invertPanAbsolute: 0
+  invertTiltAbsolute: 0
+  useSlowPanTilt: 0
+  panSlowMaxDegPerSec: 60
+  tiltSlowMaxDegPerSec: 60
+  panSlowMinDegPerSec: 0
+  tiltSlowMinDegPerSec: 0
+  enablePanTiltSpeedScaleByZoom: 0
+  panTiltSpeedScaleAtTele: 0.6
+  useLensProfile: 0
+  sensorWidthMm: 0
+  sensorHeightMm: 0
+  focalLengthMinMm: 0
+  focalLengthMaxMm: 0
+  zoomPositionTeleAtMax: 1

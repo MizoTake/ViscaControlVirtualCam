@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88ac303959017ec4b90059a5cf245435, type: 3}
+  m_Name: PTZ_Panasonic_AW-HE40
+  m_EditorClassIdentifier: 
+  panMaxDegPerSec: 90
+  tiltMaxDegPerSec: 90
+  zoomMaxFovPerSec: 30
+  panMinDegPerSec: 0
+  tiltMinDegPerSec: 0
+  panPresetMaxDegPerSec: 300
+  tiltPresetMaxDegPerSec: 300
+  panPresetMinDegPerSec: 0
+  tiltPresetMinDegPerSec: 0
+  minFov: 2.02
+  maxFov: 55.76
+  panMinDeg: -175
+  panMaxDeg: 175
+  tiltMinDeg: -30
+  tiltMaxDeg: 90
+  moveDamping: 6
+  speedGamma: 1
+  panVmin: 1
+  panVmax: 24
+  tiltVmin: 1
+  tiltVmax: 20
+  invertPan: 0
+  invertTilt: 0
+  invertPanAbsolute: 0
+  invertTiltAbsolute: 0
+  useSlowPanTilt: 0
+  panSlowMaxDegPerSec: 60
+  tiltSlowMaxDegPerSec: 60
+  panSlowMinDegPerSec: 0
+  tiltSlowMinDegPerSec: 0
+  enablePanTiltSpeedScaleByZoom: 0
+  panTiltSpeedScaleAtTele: 0.6
+  useLensProfile: 1
+  sensorWidthMm: 6.17
+  sensorHeightMm: 4.55
+  focalLengthMinMm: 4.3
+  focalLengthMaxMm: 129
+  zoomPositionTeleAtMax: 1

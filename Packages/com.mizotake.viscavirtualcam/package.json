@@ -33,7 +33,11 @@
       "displayName": "PTZ Sample Scene (Generator)",
       "description": "Editor menu to generate a ready-to-run PTZ sample scene.",
       "path": "Samples~\/PTZSample"
+    },
+    {
+      "displayName": "PTZ Preset Samples",
+      "description": "Preset assets (Indoor/Outdoor/Fast/BRC-X400/AW-HE40/PT20X + BRC-X400 tuning).",
+      "path": "Samples~\/Presets"
     }
   ]
 }
-

@@ -67,3 +67,31 @@
 - 減速度: Pan 900 / Tilt 700 / Zoom 350 (deg/s^2)
 - Target Braking: ON
 - Stop Distance: Pan 0.2 / Tilt 0.2 / Zoom 0.15 (deg)
+
+## 追加カメラプリセットについて
+
+### PTZ_Panasonic_AW-HE40（PtzSettings）
+- Pan Max (Normal): 90 deg/s
+- Tilt Max (Normal): 90 deg/s
+- Pan/Tilt Max (Preset): 300 deg/s
+- Pan Range: -175 .. 175 deg
+- Tilt Range: -30 .. 90 deg
+- FOV Range (Vertical): 2.02 .. 55.76 deg
+- レンズ: 1/2.3型センサー(6.17x4.55mm), f=4.3..129mm
+
+※FOVは1/2.3型センサーの代表寸法と焦点距離から算出しています。ズーム速度は公開仕様がないため暫定値です。必要に応じて調整してください。
+
+### PTZ_PTZOptics_PT20X（PtzSettings）
+- Pan Speed: 1.7 .. 100 deg/s
+- Tilt Speed: 1.7 .. 69.9 deg/s
+- Pan Range: -170 .. 170 deg
+- Tilt Range: -30 .. 90 deg
+- FOV Range (Vertical): 1.89 .. 34.1 deg
+- センサー: 1/2.7型 CMOS
+- レンズ: 20x (f=4.42..88.5mm)
+
+※ズーム速度は公開仕様がないため暫定値です。必要に応じて調整してください。
+
+### 参照
+- Panasonic AW-HE40 Brochure (July 2018) の仕様表
+- PTZOptics PT20X-USB G2 User Manual (Rev 1.5, 8/20) の Product Specifications

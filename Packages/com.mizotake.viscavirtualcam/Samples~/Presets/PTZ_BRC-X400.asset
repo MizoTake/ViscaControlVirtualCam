@@ -1,0 +1,52 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 88ac303959017ec4b90059a5cf245435, type: 3}
+  m_Name: PTZ_BRC-X400
+  m_EditorClassIdentifier: 
+  panMaxDegPerSec: 101
+  tiltMaxDegPerSec: 91
+  zoomMaxFovPerSec: 25
+  panMinDegPerSec: 0.5
+  tiltMinDegPerSec: 0.5
+  panPresetMaxDegPerSec: 300
+  tiltPresetMaxDegPerSec: 126
+  panPresetMinDegPerSec: 1.1
+  tiltPresetMinDegPerSec: 1.1
+  minFov: 2.1
+  maxFov: 40.4
+  panMinDeg: -170
+  panMaxDeg: 170
+  tiltMinDeg: -20
+  tiltMaxDeg: 90
+  moveDamping: 6
+  speedGamma: 1
+  panVmin: 1
+  panVmax: 24
+  tiltVmin: 1
+  tiltVmax: 20
+  invertPan: 0
+  invertTilt: 0
+  invertPanAbsolute: 0
+  invertTiltAbsolute: 0
+  useSlowPanTilt: 0
+  panSlowMaxDegPerSec: 60
+  tiltSlowMaxDegPerSec: 60
+  panSlowMinDegPerSec: 0.5
+  tiltSlowMinDegPerSec: 0.5
+  enablePanTiltSpeedScaleByZoom: 1
+  panTiltSpeedScaleAtTele: 0.5
+  useLensProfile: 1
+  sensorWidthMm: 5.76
+  sensorHeightMm: 3.24
+  focalLengthMinMm: 4.4
+  focalLengthMaxMm: 88
+  zoomPositionTeleAtMax: 1

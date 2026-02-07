@@ -49,6 +49,10 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 - メニュー: `Tools > Visca > Create PTZ Sample Scene`
 - 設定済みのPTZカメラリグを含む新しいシーンが作成されます
 
+### 1.5. サンプルプリセットの導入（任意）
+- Unity Package Managerの **Samples** から `PTZ Preset Samples` をインポート
+- Indoor/Outdoor/Fast/BRC-X400/パナソニック AW-HE40/PTZOptics PT20X と BRC-X400 チューニングが含まれます
+
 ### 2. 設定
 - **ViscaServerBehaviour**: ネットワーク設定（UDP/TCPポート、ログ）
 - **PtzControllerBehaviour**: メモリの永続化、カメラの可動範囲
@@ -56,7 +60,7 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 - **PtzSettings 追加項目**: 最小速度・プリセット速度・スローパン/チルト・レンズプロファイル（センサー/焦点距離）
 - **PtzTuningProfile（任意）**: 物理機っぽい加減速・減速上限、目標ブレーキ方式、停止距離を設定可能
 - **Pending Queue Limit**: ViscaServerBehaviourでキュー上限（既定64）を調整し、ビジー時は `Buffer Full(0x03)` を返す挙動を設定可能
-- **PTZプリセット生成**: `Tools > Visca > Create PTZ Presets (Indoor Outdoor Fast BRC-X400)` でBRC-X400含むプリセットを生成
+- **PTZプリセット生成**: `Tools > Visca > Create PTZ Presets (Indoor Outdoor Fast BRC-X400 AW-HE40 PT20X)` で複数プリセットを生成
 
 ### 3. 実行
 - 再生ボタンを押す

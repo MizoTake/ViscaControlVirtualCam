@@ -10,7 +10,7 @@ namespace ViscaControlVirtualCam.Editor
     {
         private const string PresetDir = "Assets/ViscaControlVirtualCamera/Presets";
 
-        [MenuItem("Tools/Visca/Create PTZ Presets (Indoor Outdoor Fast BRC-X400)", priority = 12)]
+        [MenuItem("Tools/Visca/Create PTZ Presets (Indoor Outdoor Fast BRC-X400 AW-HE40 PT20X)", priority = 12)]
         public static void CreatePresets()
         {
             if (!Directory.Exists(PresetDir)) Directory.CreateDirectory(PresetDir);
@@ -72,6 +72,44 @@ namespace ViscaControlVirtualCam.Editor
                 s.focalLengthMinMm = 4.4f;
                 s.focalLengthMaxMm = 88.0f;
                 s.zoomPositionTeleAtMax = true;
+            });
+            CreatePreset("PTZ_Panasonic_AW-HE40.asset", s =>
+            {
+                s.panMaxDegPerSec = 90f;
+                s.tiltMaxDegPerSec = 90f;
+                s.panPresetMaxDegPerSec = 300f;
+                s.tiltPresetMaxDegPerSec = 300f;
+                s.panMinDegPerSec = 0f;
+                s.tiltMinDegPerSec = 0f;
+                s.zoomMaxFovPerSec = 30f;
+                s.minFov = 2.02f;
+                s.maxFov = 55.76f;
+                s.panMinDeg = -175f;
+                s.panMaxDeg = 175f;
+                s.tiltMinDeg = -30f;
+                s.tiltMaxDeg = 90f;
+                s.speedGamma = 1.0f;
+                s.useLensProfile = true;
+                s.sensorWidthMm = 6.17f;
+                s.sensorHeightMm = 4.55f;
+                s.focalLengthMinMm = 4.3f;
+                s.focalLengthMaxMm = 129.0f;
+                s.zoomPositionTeleAtMax = true;
+            });
+            CreatePreset("PTZ_PTZOptics_PT20X.asset", s =>
+            {
+                s.panMaxDegPerSec = 100f;
+                s.tiltMaxDegPerSec = 69.9f;
+                s.panMinDegPerSec = 1.7f;
+                s.tiltMinDegPerSec = 1.7f;
+                s.zoomMaxFovPerSec = 30f;
+                s.minFov = 1.89f;
+                s.maxFov = 34.1f;
+                s.panMinDeg = -170f;
+                s.panMaxDeg = 170f;
+                s.tiltMinDeg = -30f;
+                s.tiltMaxDeg = 90f;
+                s.speedGamma = 1.0f;
             });
 
             CreateTuningPreset("PTZ_Tuning_BRC-X400.asset", t =>
