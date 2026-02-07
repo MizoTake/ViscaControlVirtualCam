@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Threading;
 
 namespace ViscaControlVirtualCam
@@ -16,8 +17,7 @@ namespace ViscaControlVirtualCam
         private readonly PtzModel _model;
         private readonly ViscaReplyMode _replyMode;
         private byte _focusMode = ViscaProtocol.FocusModeManual;
-        private int _pendingOperations;
-        private int _cancelGeneration;
+        private readonly ConcurrentDictionary<byte, SessionState> _sessions = new();
 
         public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode,
             Action<string> logger = null, int maxPendingOperations = 64)
@@ -279,8 +279,9 @@ namespace ViscaControlVirtualCam
         private bool HandleCommandCancel(in ViscaCommandContext ctx)
         {
             // Always acknowledge cancel as CommandCanceled per spec, even if nothing is pending
-            Interlocked.Exchange(ref _pendingOperations, 0); // best-effort clear any pending work
-            Interlocked.Increment(ref _cancelGeneration); // suppress completions from earlier enqueued commands
+            var session = GetSession(ctx.SocketId);
+            Interlocked.Exchange(ref session.PendingOperations, 0); // best-effort clear pending work for this socket
+            Interlocked.Increment(ref session.CancelGeneration); // suppress completions from earlier enqueued commands
             ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorCommandCancelled, ctx.SocketId);
             return true;
         }
@@ -289,12 +290,13 @@ namespace ViscaControlVirtualCam
         {
             var responder = ctx.Responder;
             var socketId = ctx.SocketId;
-            var generation = _cancelGeneration;
+            var session = GetSession(socketId);
+            var generation = session.CancelGeneration;
 
-            var newCount = Interlocked.Increment(ref _pendingOperations);
+            var newCount = Interlocked.Increment(ref session.PendingOperations);
             if (newCount > _maxPendingOperations)
             {
-                Interlocked.Decrement(ref _pendingOperations);
+                Interlocked.Decrement(ref session.PendingOperations);
                 ViscaResponse.SendError(responder, ViscaProtocol.ErrorCommandBuffer, socketId);
                 return false;
             }
@@ -314,8 +316,9 @@ namespace ViscaControlVirtualCam
                 }
                 finally
                 {
-                    Interlocked.Decrement(ref _pendingOperations);
-                    if (shouldComplete && generation == _cancelGeneration)
+                    var remaining = Interlocked.Decrement(ref session.PendingOperations);
+                    if (remaining < 0) Interlocked.Exchange(ref session.PendingOperations, 0);
+                    if (shouldComplete && generation == session.CancelGeneration)
                         ViscaResponse.SendCompletion(responder, _replyMode, socketId);
                 }
             });
@@ -323,9 +326,20 @@ namespace ViscaControlVirtualCam
             return true;
         }
 
+        private SessionState GetSession(byte socketId)
+        {
+            return _sessions.GetOrAdd(socketId, _ => new SessionState());
+        }
+
         private static float Clamp01(float v)
         {
             return v < 0f ? 0f : v > 1f ? 1f : v;
+        }
+
+        private sealed class SessionState
+        {
+            public int PendingOperations;
+            public int CancelGeneration;
         }
     }
 }

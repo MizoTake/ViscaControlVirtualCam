@@ -15,6 +15,13 @@ namespace ViscaControlVirtualCam
         [Tooltip("ズーム(FOV)の最大速度(度/秒)")]
         public float zoomMaxFovPerSec = 40f;
 
+        [Header("ズーム速度モード")]
+        [Tooltip("ズーム速度をズーム位置(正規化)で制御する")]
+        public bool useZoomPositionSpeed = false;
+
+        [Tooltip("ズーム位置の最大速度(正規化/秒) (0で自動換算)")]
+        public float zoomMaxNormalizedPerSec = 0f;
+
         [Header("速度下限/プリセット速度")]
         [Tooltip("パンの最小速度(度/秒)")]
         public float panMinDegPerSec = 0f;
@@ -130,6 +137,8 @@ namespace ViscaControlVirtualCam
             model.PanMaxDegPerSec = panMaxDegPerSec;
             model.TiltMaxDegPerSec = tiltMaxDegPerSec;
             model.ZoomMaxFovPerSec = zoomMaxFovPerSec;
+            model.UseZoomPositionSpeed = useZoomPositionSpeed;
+            model.ZoomMaxNormalizedPerSec = zoomMaxNormalizedPerSec;
             model.PanMinDegPerSec = panMinDegPerSec;
             model.TiltMinDegPerSec = tiltMinDegPerSec;
             model.PanPresetMaxDegPerSec = panPresetMaxDegPerSec;

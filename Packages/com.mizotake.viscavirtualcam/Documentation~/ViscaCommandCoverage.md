@@ -9,6 +9,8 @@
 |---------|----------------|---------|
 | Pan/Tilt Drive | `8X 01 06 01 VV WW PP TT FF` | ✓ 実装済み |
 | Pan/Tilt Absolute | `8X 01 06 02 [VV WW] p1 p2 p3 p4 t1 t2 t3 t4 FF` | ✓ 実装済み |
+| Pan/Tilt Home | `8X 01 06 04 FF` | ✓ 実装済み |
+| Pan/Tilt Reset | `8X 01 06 05 FF` | ✓ 実装済み |
 
 ### Zoom Control
 | コマンド | バイトシーケンス | 実装状況 |
@@ -21,6 +23,8 @@
 |---------|----------------|---------|
 | Focus Variable | `8X 01 04 08 ZZ FF` | ✓ 実装済み (Blackmagic) |
 | Focus Direct | `8X 01 04 48 p1 p2 p3 p4 FF` | ✓ 実装済み (Blackmagic) |
+| Focus Mode (Auto/Manual) | `8X 01 04 38 pp FF` | ✓ 実装済み |
+| Focus One Push AF | `8X 01 04 18 01 FF` | ✓ 実装済み |
 
 ### Iris/Exposure Control
 | コマンド | バイトシーケンス | 実装状況 |
@@ -33,6 +37,20 @@
 |---------|----------------|---------|
 | Memory Recall | `8X 01 04 3F 02 pp FF` | ✓ 実装済み (Blackmagic) |
 | Memory Set | `8X 01 04 3F 01 pp FF` | ✓ 実装済み (Blackmagic) |
+| Memory Reset | `8X 01 04 3F 00 pp FF` | ✓ 実装済み |
+
+### Control Commands
+| コマンド | バイトシーケンス | 実装状況 |
+|---------|----------------|---------|
+| Command Cancel | `8X 2Z FF` | ✓ 実装済み |
+
+### Inquiry Commands (応答系)
+| コマンド | バイトシーケンス | 実装状況 |
+|---------|----------------|---------|
+| Pan/Tilt Position Inquiry | `8X 09 06 12 FF` | ✓ 実装済み |
+| Zoom Position Inquiry | `8X 09 04 47 FF` | ✓ 実装済み |
+| Focus Position Inquiry | `8X 09 04 48 FF` | ✓ 実装済み |
+| Focus Mode Inquiry | `8X 09 04 38 FF` | ✓ 実装済み |
 
 ---
 
@@ -47,8 +65,6 @@
 ### Pan/Tilt Extended
 | コマンド | バイトシーケンス | 優先度 | 備考 |
 |---------|----------------|-------|------|
-| Pan/Tilt Home | `8X 01 06 04 FF` | 中 | プリセット0として実装可能 |
-| Pan/Tilt Reset | `8X 01 06 05 FF` | 低 | 位置リセット |
 | Pan/Tilt Limit Set | `8X 01 06 07 0W 0p 0p 0p 0p 0t 0t 0t 0t FF` | 低 | 可動範囲制限 |
 
 ### Zoom Extended
@@ -62,9 +78,6 @@
 ### Focus Extended
 | コマンド | バイトシーケンス | 優先度 | 備考 |
 |---------|----------------|-------|------|
-| Focus Auto | `8X 01 04 38 02 FF` | 中 | Auto Focus ON |
-| Focus Manual | `8X 01 04 38 03 FF` | 中 | Manual Focus |
-| Focus One Push AF | `8X 01 04 18 01 FF` | 低 | ワンプッシュAF |
 | Focus Near Limit | `8X 01 04 28 p1 p2 p3 p4 FF` | 低 | 最近接距離設定 |
 
 ### Auto Exposure (AE)
@@ -91,14 +104,6 @@
 | Picture Effect | `8X 01 04 63 pp FF` | 低 | ピクチャーエフェクト |
 | Noise Reduction | `8X 01 04 53 pp FF` | 低 | ノイズリダクション |
 
-### Inquiry Commands (応答系)
-| コマンド | バイトシーケンス | 優先度 | 備考 |
-|---------|----------------|-------|------|
-| Pan/Tilt Position Inquiry | `8X 09 06 12 FF` | 中 | 現在位置問い合わせ |
-| Zoom Position Inquiry | `8X 09 04 47 FF` | 中 | ズーム位置問い合わせ |
-| Focus Position Inquiry | `8X 09 04 48 FF` | 低 | フォーカス位置問い合わせ |
-| Focus Mode Inquiry | `8X 09 04 38 FF` | 低 | フォーカスモード問い合わせ |
-
 ---
 
 ## 実装の推奨順
@@ -110,9 +115,8 @@ Unity Virtual Camera用途を考慮した優先度付け:
 
 ### 優先度: 中
 必要に応じて追加を検討:
-1. **Pan/Tilt Home** (`8X 01 06 04 FF`) - ホームポジション移動
-2. **Focus Auto/Manual** (`8X 01 04 38 pp FF`) - AF/MF切り替え
-3. **Position Inquiry系** - 現在位置の問い合わせ（デバッグ用）
+1. **Pan/Tilt Limit Set** (`8X 01 06 07 ...`) - 可動範囲制限
+2. **Focus Near Limit** (`8X 01 04 28 ...`) - 最近接距離設定
 
 ### 優先度: 低
 Virtual Camera用途では不要:
@@ -137,8 +141,8 @@ Blackmagic ATEMスイッチャーから送信される可能性が高いコマ�
 - Memory Recall/Set
 
 **未実装だが送信される可能性あり**
-- Pan/Tilt Home (プリセット0として実装済みの場合は不要)
-- Position Inquiry系 (状態確認用)
+- Pan/Tilt Limit Set
+- Focus Near Limit
 
 ---
 
@@ -161,8 +165,7 @@ Blackmagic ATEMスイッチャーから送信される可能性が高いコマ�
 現在の実装で、Blackmagic ATEM等のスイッチャーからの**PTZ制御に必要な主要コマンドは網羅**されています。
 
 追加で実装を検討すべきコマンド:
-1. Pan/Tilt Home（ホームポジション）
-2. Focus Auto/Manual切り替え
-3. Position Inquiry（デバッグ/状態確認用）
+1. Pan/Tilt Limit Set（可動範囲）
+2. Focus Near Limit（最近接距離）
 
 その他のコマンド（電源、ホワイトバランス、ピクチャーエフェクト等）はUnity Virtual Camera用途では不要です。

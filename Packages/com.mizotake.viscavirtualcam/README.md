@@ -57,9 +57,9 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 - **ViscaServerBehaviour**: ネットワーク設定（UDP/TCPポート、ログ）
 - **PtzControllerBehaviour**: メモリの永続化、カメラの可動範囲
 - **PtzSettings**: 速度カーブ、移動の減衰、FOV範囲、Pan/Tilt反転（速度/絶対位置別）、望遠時の速度抑制
-- **PtzSettings 追加項目**: 最小速度・プリセット速度・スローパン/チルト・レンズプロファイル（センサー/焦点距離）
-- **PtzTuningProfile（任意）**: 物理機っぽい加減速・減速上限、目標ブレーキ方式、停止距離を設定可能
-- **Pending Queue Limit**: ViscaServerBehaviourでキュー上限（既定64）を調整し、ビジー時は `Buffer Full(0x03)` を返す挙動を設定可能
+- **PtzSettings 追加項目**: 最小速度・プリセット速度・スローパン/チルト・レンズプロファイル（センサー/焦点距離）・ズーム位置速度モード
+- **PtzTuningProfile（任意）**: 物理機っぽい加減速・減速上限、目標ブレーキ方式、停止距離、速度スムージングを設定可能
+- **Pending Queue Limit**: ViscaServerBehaviourでキュー上限（既定64、ソケット単位）を調整し、ビジー時は `Buffer Full(0x03)` を返す挙動を設定可能
 - **PTZプリセット生成**: `Tools > Visca > Create PTZ Presets (Indoor Outdoor Fast BRC-X400 AW-HE40 PT20X)` で複数プリセットを生成
 
 ### 3. 実行

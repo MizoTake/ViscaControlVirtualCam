@@ -52,6 +52,14 @@ namespace ViscaControlVirtualCam
         [Min(0f)]
         public float zoomStopDistanceDeg = 0.1f;
 
+        [Header("速度スムージング")]
+        [Tooltip("速度の一次遅れスムージングを有効化")]
+        public bool enableVelocitySmoothing = false;
+
+        [Tooltip("速度スムージングの時定数(秒)")]
+        [Min(0f)]
+        public float velocitySmoothingTime = 0.1f;
+
         public void ApplyTo(PtzModel model)
         {
             if (model == null) return;
@@ -67,6 +75,8 @@ namespace ViscaControlVirtualCam
             model.PanStopDistanceDeg = panStopDistanceDeg;
             model.TiltStopDistanceDeg = tiltStopDistanceDeg;
             model.ZoomStopDistanceDeg = zoomStopDistanceDeg;
+            model.UseVelocitySmoothing = enableVelocitySmoothing;
+            model.VelocitySmoothingTime = velocitySmoothingTime;
         }
     }
 }

@@ -104,7 +104,7 @@ public class ViscaResponseTests
 
         handler.Handle(in moveCtx); // enqueues action, sends ACK
 
-        var cancelCtx = ViscaCommandContext.CommandCancel(new byte[] { 0x85, 0x23, 0xFF }, b => sent.Add(b));
+        var cancelCtx = ViscaCommandContext.CommandCancel(new byte[] { 0x85, 0x25, 0xFF }, b => sent.Add(b));
         handler.Handle(in cancelCtx); // sends cancel
 
         // Execute pending action after cancel; completion should be suppressed
@@ -112,7 +112,7 @@ public class ViscaResponseTests
 
         Assert.AreEqual(2, sent.Count, "Only ACK and Cancel should be sent");
         CollectionAssert.AreEqual(new byte[] { 0x90, 0x45, 0xFF }, sent[0]);
-        CollectionAssert.AreEqual(new byte[] { 0x90, 0x63, 0x04, 0xFF }, sent[1]);
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x65, 0x04, 0xFF }, sent[1]);
     }
 
     private sealed class CapturingHandler : IViscaCommandHandler

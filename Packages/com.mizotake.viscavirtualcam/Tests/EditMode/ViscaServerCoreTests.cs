@@ -467,107 +467,116 @@ public class ViscaServerCoreTests
     [Timeout(5000)]
     public void UdpServer_StartStop_NoException()
     {
-        var handler = new StubHandler();
-        var options = new ViscaServerOptions
+        RunSocketTest(() =>
         {
-            Transport = ViscaTransport.UdpRawVisca,
-            UdpPort = GetAvailablePort(),
-            VerboseLog = false
-        };
+            var handler = new StubHandler();
+            var options = new ViscaServerOptions
+            {
+                Transport = ViscaTransport.UdpRawVisca,
+                UdpPort = GetAvailablePort(),
+                VerboseLog = false
+            };
 
-        using (var server = new ViscaServerCore(handler, options))
-        {
-            server.Start();
-            Thread.Sleep(100); // Let server initialize
-            server.Stop();
-        }
+            using (var server = new ViscaServerCore(handler, options))
+            {
+                server.Start();
+                Thread.Sleep(100); // Let server initialize
+                server.Stop();
+            }
 
-        Assert.Pass("UDP server started and stopped without exception");
+            Assert.Pass("UDP server started and stopped without exception");
+        });
     }
 
     [Test]
     [Timeout(5000)]
     public void UdpServer_SendReceive_RespondsCorrectly()
     {
-        var handler = new StubHandler();
-        var port = GetAvailablePort();
-        var options = new ViscaServerOptions
+        RunSocketTest(() =>
         {
-            Transport = ViscaTransport.UdpRawVisca,
-            UdpPort = port,
-            VerboseLog = false,
-            LogReceivedCommands = false
-        };
-
-        using (var server = new ViscaServerCore(handler, options))
-        {
-            server.Start();
-            Thread.Sleep(100);
-
-            using (var client = new UdpClient())
+            var handler = new StubHandler();
+            var port = GetAvailablePort();
+            var options = new ViscaServerOptions
             {
-                var endpoint = new IPEndPoint(IPAddress.Loopback, port);
+                Transport = ViscaTransport.UdpRawVisca,
+                UdpPort = port,
+                VerboseLog = false,
+                LogReceivedCommands = false
+            };
 
-                // Send MemoryRecall command
-                byte[] command = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF };
-                client.Send(command, command.Length, endpoint);
+            using (var server = new ViscaServerCore(handler, options))
+            {
+                server.Start();
+                Thread.Sleep(100);
 
-                // Wait for response
-                client.Client.ReceiveTimeout = 2000;
-                var remoteEp = new IPEndPoint(IPAddress.Any, 0);
-
-                try
+                using (var client = new UdpClient())
                 {
-                    var response = client.Receive(ref remoteEp);
-                    Assert.IsNotNull(response);
-                    Assert.Greater(response.Length, 0, "Should receive a response");
-                }
-                catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
-                {
-                    Assert.Fail("Timeout waiting for UDP response");
+                    var endpoint = new IPEndPoint(IPAddress.Loopback, port);
+
+                    // Send MemoryRecall command
+                    byte[] command = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF };
+                    client.Send(command, command.Length, endpoint);
+
+                    // Wait for response
+                    client.Client.ReceiveTimeout = 2000;
+                    var remoteEp = new IPEndPoint(IPAddress.Any, 0);
+
+                    try
+                    {
+                        var response = client.Receive(ref remoteEp);
+                        Assert.IsNotNull(response);
+                        Assert.Greater(response.Length, 0, "Should receive a response");
+                    }
+                    catch (SocketException ex) when (ex.SocketErrorCode == SocketError.TimedOut)
+                    {
+                        Assert.Fail("Timeout waiting for UDP response");
+                    }
                 }
             }
-        }
+        });
     }
 
     [Test]
     [Timeout(5000)]
     public void UdpServer_MultiplePackets_AllProcessed()
     {
-        var receivedCount = 0;
-        var handler = new CountingHandler(() => Interlocked.Increment(ref receivedCount));
-        var port = GetAvailablePort();
-        var options = new ViscaServerOptions
+        RunSocketTest(() =>
         {
-            Transport = ViscaTransport.UdpRawVisca,
-            UdpPort = port,
-            VerboseLog = false,
-            LogReceivedCommands = false
-        };
-
-        using (var server = new ViscaServerCore(handler, options))
-        {
-            server.Start();
-            Thread.Sleep(100);
-
-            using (var client = new UdpClient())
+            var receivedCount = 0;
+            var handler = new CountingHandler(() => Interlocked.Increment(ref receivedCount));
+            var port = GetAvailablePort();
+            var options = new ViscaServerOptions
             {
-                var endpoint = new IPEndPoint(IPAddress.Loopback, port);
-                byte[] command = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF };
+                Transport = ViscaTransport.UdpRawVisca,
+                UdpPort = port,
+                VerboseLog = false,
+                LogReceivedCommands = false
+            };
 
-                // Send multiple packets
-                for (int i = 0; i < 5; i++)
+            using (var server = new ViscaServerCore(handler, options))
+            {
+                server.Start();
+                Thread.Sleep(100);
+
+                using (var client = new UdpClient())
                 {
-                    client.Send(command, command.Length, endpoint);
-                    Thread.Sleep(50);
+                    var endpoint = new IPEndPoint(IPAddress.Loopback, port);
+                    byte[] command = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF };
+
+                    // Send multiple packets
+                    for (int i = 0; i < 5; i++)
+                    {
+                        client.Send(command, command.Length, endpoint);
+                        Thread.Sleep(50);
+                    }
+
+                    // Wait for processing
+                    Thread.Sleep(500);
                 }
-
-                // Wait for processing
-                Thread.Sleep(500);
             }
-        }
 
-        Assert.AreEqual(5, receivedCount, "All 5 packets should be processed");
+            Assert.AreEqual(5, receivedCount, "All 5 packets should be processed");
+        });
     }
 
     #endregion
@@ -578,148 +587,160 @@ public class ViscaServerCoreTests
     [Timeout(5000)]
     public void TcpServer_StartStop_NoException()
     {
-        var handler = new StubHandler();
-        var options = new ViscaServerOptions
+        RunSocketTest(() =>
         {
-            Transport = ViscaTransport.TcpRawVisca,
-            TcpPort = GetAvailablePort(),
-            VerboseLog = false
-        };
+            var handler = new StubHandler();
+            var options = new ViscaServerOptions
+            {
+                Transport = ViscaTransport.TcpRawVisca,
+                TcpPort = GetAvailablePort(),
+                VerboseLog = false
+            };
 
-        using (var server = new ViscaServerCore(handler, options))
-        {
-            server.Start();
-            Thread.Sleep(100);
-            server.Stop();
-        }
+            using (var server = new ViscaServerCore(handler, options))
+            {
+                server.Start();
+                Thread.Sleep(100);
+                server.Stop();
+            }
 
-        Assert.Pass("TCP server started and stopped without exception");
+            Assert.Pass("TCP server started and stopped without exception");
+        });
     }
 
     [Test]
     [Timeout(5000)]
     public void TcpServer_ClientConnect_AcceptsConnection()
     {
-        var handler = new StubHandler();
-        var port = GetAvailablePort();
-        var options = new ViscaServerOptions
+        RunSocketTest(() =>
         {
-            Transport = ViscaTransport.TcpRawVisca,
-            TcpPort = port,
-            VerboseLog = false
-        };
-
-        using (var server = new ViscaServerCore(handler, options))
-        {
-            server.Start();
-            Thread.Sleep(100);
-
-            using (var client = new TcpClient())
+            var handler = new StubHandler();
+            var port = GetAvailablePort();
+            var options = new ViscaServerOptions
             {
-                client.Connect(IPAddress.Loopback, port);
-                Assert.IsTrue(client.Connected, "Client should connect successfully");
+                Transport = ViscaTransport.TcpRawVisca,
+                TcpPort = port,
+                VerboseLog = false
+            };
+
+            using (var server = new ViscaServerCore(handler, options))
+            {
+                server.Start();
+                Thread.Sleep(100);
+
+                using (var client = new TcpClient())
+                {
+                    client.Connect(IPAddress.Loopback, port);
+                    Assert.IsTrue(client.Connected, "Client should connect successfully");
+                }
             }
-        }
+        });
     }
 
     [Test]
     [Timeout(5000)]
     public void TcpServer_SendReceive_RespondsCorrectly()
     {
-        var handler = new StubHandler();
-        var port = GetAvailablePort();
-        var options = new ViscaServerOptions
+        RunSocketTest(() =>
         {
-            Transport = ViscaTransport.TcpRawVisca,
-            TcpPort = port,
-            VerboseLog = false,
-            LogReceivedCommands = false
-        };
-
-        using (var server = new ViscaServerCore(handler, options))
-        {
-            server.Start();
-            Thread.Sleep(100);
-
-            using (var client = new TcpClient())
+            var handler = new StubHandler();
+            var port = GetAvailablePort();
+            var options = new ViscaServerOptions
             {
-                client.Connect(IPAddress.Loopback, port);
-                var stream = client.GetStream();
-                stream.ReadTimeout = 2000;
+                Transport = ViscaTransport.TcpRawVisca,
+                TcpPort = port,
+                VerboseLog = false,
+                LogReceivedCommands = false
+            };
 
-                // Send MemoryRecall command
-                byte[] command = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF };
-                stream.Write(command, 0, command.Length);
-                stream.Flush();
+            using (var server = new ViscaServerCore(handler, options))
+            {
+                server.Start();
+                Thread.Sleep(100);
 
-                // Read response
-                var buffer = new byte[256];
-                try
+                using (var client = new TcpClient())
                 {
-                    var bytesRead = stream.Read(buffer, 0, buffer.Length);
-                    Assert.Greater(bytesRead, 0, "Should receive a response");
-                }
-                catch (System.IO.IOException)
-                {
-                    Assert.Fail("Timeout waiting for TCP response");
+                    client.Connect(IPAddress.Loopback, port);
+                    var stream = client.GetStream();
+                    stream.ReadTimeout = 2000;
+
+                    // Send MemoryRecall command
+                    byte[] command = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x00, 0xFF };
+                    stream.Write(command, 0, command.Length);
+                    stream.Flush();
+
+                    // Read response
+                    var buffer = new byte[256];
+                    try
+                    {
+                        var bytesRead = stream.Read(buffer, 0, buffer.Length);
+                        Assert.Greater(bytesRead, 0, "Should receive a response");
+                    }
+                    catch (System.IO.IOException)
+                    {
+                        Assert.Fail("Timeout waiting for TCP response");
+                    }
                 }
             }
-        }
+        });
     }
 
     [Test]
     [Timeout(5000)]
     public void TcpServer_MaxClients_RefusesExcess()
     {
-        var handler = new StubHandler();
-        var port = GetAvailablePort();
-        var options = new ViscaServerOptions
+        RunSocketTest(() =>
         {
-            Transport = ViscaTransport.TcpRawVisca,
-            TcpPort = port,
-            MaxClients = 2,
-            VerboseLog = false
-        };
-
-        var clients = new List<TcpClient>();
-        using (var server = new ViscaServerCore(handler, options))
-        {
-            server.Start();
-            Thread.Sleep(100);
-
-            try
+            var handler = new StubHandler();
+            var port = GetAvailablePort();
+            var options = new ViscaServerOptions
             {
-                // Connect MaxClients clients
-                for (int i = 0; i < options.MaxClients; i++)
-                {
-                    var client = new TcpClient();
-                    client.Connect(IPAddress.Loopback, port);
-                    clients.Add(client);
-                    Thread.Sleep(50);
-                }
+                Transport = ViscaTransport.TcpRawVisca,
+                TcpPort = port,
+                MaxClients = 2,
+                VerboseLog = false
+            };
 
-                Assert.AreEqual(options.MaxClients, clients.Count(c => c.Connected),
-                    $"Should accept {options.MaxClients} clients");
-
-                // Try to connect one more (should be refused or disconnected)
-                var extraClient = new TcpClient();
-                extraClient.Connect(IPAddress.Loopback, port);
-                Thread.Sleep(200);
-
-                // The extra client may connect briefly but should be closed
-                // We just verify the server doesn't crash
-                extraClient.Close();
-            }
-            finally
+            var clients = new List<TcpClient>();
+            using (var server = new ViscaServerCore(handler, options))
             {
-                foreach (var client in clients)
+                server.Start();
+                Thread.Sleep(100);
+
+                try
                 {
-                    client.Close();
+                    // Connect MaxClients clients
+                    for (int i = 0; i < options.MaxClients; i++)
+                    {
+                        var client = new TcpClient();
+                        client.Connect(IPAddress.Loopback, port);
+                        clients.Add(client);
+                        Thread.Sleep(50);
+                    }
+
+                    Assert.AreEqual(options.MaxClients, clients.Count(c => c.Connected),
+                        $"Should accept {options.MaxClients} clients");
+
+                    // Try to connect one more (should be refused or disconnected)
+                    var extraClient = new TcpClient();
+                    extraClient.Connect(IPAddress.Loopback, port);
+                    Thread.Sleep(200);
+
+                    // The extra client may connect briefly but should be closed
+                    // We just verify the server doesn't crash
+                    extraClient.Close();
+                }
+                finally
+                {
+                    foreach (var client in clients)
+                    {
+                        client.Close();
+                    }
                 }
             }
-        }
 
-        Assert.Pass("Server handled max clients correctly");
+            Assert.Pass("Server handled max clients correctly");
+        });
     }
 
     #endregion
@@ -733,6 +754,23 @@ public class ViscaServerCoreTests
             socket.Bind(new IPEndPoint(IPAddress.Loopback, 0));
             return ((IPEndPoint)socket.LocalEndPoint).Port;
         }
+    }
+
+    private static void RunSocketTest(Action action)
+    {
+        try
+        {
+            action();
+        }
+        catch (SocketException ex) when (IsAccessDenied(ex))
+        {
+            Assert.Inconclusive($"Socket access denied in test environment: {ex.Message}");
+        }
+    }
+
+    private static bool IsAccessDenied(SocketException ex)
+    {
+        return ex.SocketErrorCode == SocketError.AccessDenied;
     }
 
     #endregion

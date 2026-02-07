@@ -83,6 +83,67 @@ public class PtzModelTests
     }
 
     [Test]
+    public void ZoomPositionSpeed_TeleMovesTowardMinFov()
+    {
+        var m = new PtzModel
+        {
+            UseZoomPositionSpeed = true,
+            ZoomMaxNormalizedPerSec = 1f,
+            MinFov = 10f,
+            MaxFov = 90f,
+            SpeedGamma = 1.0f,
+            UseAccelerationLimit = false
+        };
+
+        m.CommandZoomVariable(0x27); // Tele, max speed
+        var step = m.Step(0f, 0f, 50f, 1.0f);
+
+        Assert.IsTrue(step.HasNewFov);
+        Assert.That(step.NewFovDeg, Is.EqualTo(10f).Within(0.1f));
+    }
+
+    [Test]
+    public void ZoomPositionSpeed_UsesAutoNormalizedSpeed()
+    {
+        var m = new PtzModel
+        {
+            UseZoomPositionSpeed = true,
+            ZoomMaxNormalizedPerSec = 0f,
+            ZoomMaxFovPerSec = 20f,
+            MinFov = 10f,
+            MaxFov = 90f,
+            SpeedGamma = 1.0f,
+            UseAccelerationLimit = false
+        };
+
+        m.CommandZoomVariable(0x27); // Tele, max speed
+        var step = m.Step(0f, 0f, 50f, 1.0f);
+
+        Assert.IsTrue(step.HasNewFov);
+        Assert.That(step.NewFovDeg, Is.EqualTo(30f).Within(0.2f));
+    }
+
+    [Test]
+    public void VelocitySmoothing_ReducesInitialSpeed()
+    {
+        var m = new PtzModel
+        {
+            PanMaxDegPerSec = 100f,
+            PanVmin = 0x01,
+            PanVmax = 0x18,
+            SpeedGamma = 1.0f,
+            UseVelocitySmoothing = true,
+            VelocitySmoothingTime = 10f,
+            UseAccelerationLimit = false
+        };
+
+        m.CommandPanTiltVariable(0x18, 0x01, AxisDirection.Positive, AxisDirection.Stop);
+        var step = m.Step(0f, 0f, 60f, 1.0f);
+
+        Assert.Less(step.DeltaYawDeg, 50f);
+    }
+
+    [Test]
     public void Absolute_Move_ReachesTarget()
     {
         var m = new PtzModel
