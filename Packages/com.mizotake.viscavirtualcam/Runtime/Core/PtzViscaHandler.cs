@@ -117,8 +117,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandlePanTiltReset(in ViscaCommandContext ctx)
         {
-            var capturedCtx2 = ctx;
-            if (!TryEnqueue(capturedCtx2,
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx,
                     () => _model.CommandPanTiltAbsolute(0, 0, ViscaProtocol.PositionCenter,
                         ViscaProtocol.PositionCenter)))
                 return true;
@@ -129,8 +129,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleZoomVariable(in ViscaCommandContext ctx)
         {
-            var capturedCtx3 = ctx;
-            if (!TryEnqueue(capturedCtx3, () => _model.CommandZoomVariable(capturedCtx3.ZoomSpeed)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandZoomVariable(capturedCtx.ZoomSpeed)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -139,8 +139,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleZoomDirect(in ViscaCommandContext ctx)
         {
-            var capturedCtx4 = ctx;
-            if (!TryEnqueue(capturedCtx4, () => _model.CommandZoomDirect(capturedCtx4.ZoomPosition)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandZoomDirect(capturedCtx.ZoomPosition)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -149,8 +149,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleFocusVariable(in ViscaCommandContext ctx)
         {
-            var capturedCtx5 = ctx;
-            if (!TryEnqueue(capturedCtx5, () => _model.CommandFocusVariable(capturedCtx5.FocusSpeed)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandFocusVariable(capturedCtx.FocusSpeed)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -159,8 +159,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleFocusDirect(in ViscaCommandContext ctx)
         {
-            var capturedCtx6 = ctx;
-            if (!TryEnqueue(capturedCtx6, () => _model.CommandFocusDirect(capturedCtx6.FocusPosition)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandFocusDirect(capturedCtx.FocusPosition)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -187,8 +187,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleIrisVariable(in ViscaCommandContext ctx)
         {
-            var capturedCtx7 = ctx;
-            if (!TryEnqueue(capturedCtx7, () => _model.CommandIrisVariable(capturedCtx7.IrisDirection)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandIrisVariable(capturedCtx.IrisDirection)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -197,8 +197,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleIrisDirect(in ViscaCommandContext ctx)
         {
-            var capturedCtx8 = ctx;
-            if (!TryEnqueue(capturedCtx8, () => _model.CommandIrisDirect(capturedCtx8.IrisPosition)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandIrisDirect(capturedCtx.IrisPosition)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -207,8 +207,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleMemoryRecall(in ViscaCommandContext ctx)
         {
-            var capturedCtx9 = ctx;
-            if (!TryEnqueue(capturedCtx9, () => _model.CommandMemoryRecall(capturedCtx9.MemoryNumber)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandMemoryRecall(capturedCtx.MemoryNumber)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -217,8 +217,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleMemorySet(in ViscaCommandContext ctx)
         {
-            var capturedCtx10 = ctx;
-            if (!TryEnqueue(capturedCtx10, () => _model.CommandMemorySet(capturedCtx10.MemoryNumber)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.CommandMemorySet(capturedCtx.MemoryNumber)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
@@ -227,8 +227,8 @@ namespace ViscaControlVirtualCam
 
         private bool HandleMemoryReset(in ViscaCommandContext ctx)
         {
-            var capturedCtx11 = ctx;
-            if (!TryEnqueue(capturedCtx11, () => _model.DeletePreset(capturedCtx11.MemoryNumber)))
+            var capturedCtx = ctx;
+            if (!TryEnqueue(capturedCtx, () => _model.DeletePreset(capturedCtx.MemoryNumber)))
                 return true;
 
             ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);

@@ -104,5 +104,16 @@ namespace ViscaControlVirtualCam
             var speed = minDegPerSec + (maxDegPerSec - minDegPerSec) * mapped;
             return speed < 0f ? 0f : speed;
         }
+
+        /// <summary>
+        ///     Normalize an Euler angle to the range [-180, 180].
+        /// </summary>
+        public static float NormalizeAngle(float euler)
+        {
+            var a = euler;
+            while (a > 180f) a -= 360f;
+            while (a < -180f) a += 360f;
+            return a;
+        }
     }
 }

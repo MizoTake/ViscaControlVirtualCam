@@ -75,7 +75,7 @@ namespace ViscaControlVirtualCam
             }
             catch (Exception e)
             {
-                Log($"Stop cancel error: {e.Message}");
+                Log($"Stop cancel error: {e}");
             }
 
             try
@@ -84,7 +84,7 @@ namespace ViscaControlVirtualCam
             }
             catch (Exception e)
             {
-                Log($"UDP close error: {e.Message}");
+                Log($"UDP close error: {e}");
             }
 
             try
@@ -93,7 +93,7 @@ namespace ViscaControlVirtualCam
             }
             catch (Exception e)
             {
-                Log($"TCP stop error: {e.Message}");
+                Log($"TCP stop error: {e}");
             }
 
             _udp = null;
@@ -104,7 +104,7 @@ namespace ViscaControlVirtualCam
             }
             catch (Exception e)
             {
-                Log($"CTS dispose error: {e.Message}");
+                Log($"CTS dispose error: {e}");
             }
             _cts = null;
             foreach (var kv in _clients)
@@ -114,7 +114,7 @@ namespace ViscaControlVirtualCam
                 }
                 catch (Exception e)
                 {
-                    Log($"TCP client close error: {e.Message}");
+                    Log($"TCP client close error: {e}");
                 }
 
             _clients.Clear();
@@ -131,7 +131,7 @@ namespace ViscaControlVirtualCam
             }
             catch (Exception e)
             {
-                Log($"UDP begin receive error: {e.Message}");
+                Log($"UDP begin receive error: {e}");
                 throw;
             }
 
@@ -166,14 +166,14 @@ namespace ViscaControlVirtualCam
             catch (Exception e)
             {
                 // Only log if still active to avoid noise during shutdown
-                if (_udp != null) Log($"UDP receive error: {e.Message}");
+                if (_udp != null) Log($"UDP receive error: {e}");
                 try
                 {
                     _udp?.BeginReceive(UdpReceiveCallback, null);
                 }
                 catch (Exception ex)
                 {
-                    Log($"UDP begin receive error: {ex.Message}");
+                    Log($"UDP begin receive error: {ex}");
                 }
 
                 return;
@@ -185,7 +185,7 @@ namespace ViscaControlVirtualCam
             }
             catch (Exception e)
             {
-                Log($"UDP begin receive error: {e.Message}");
+                Log($"UDP begin receive error: {e}");
             }
 
             Action<byte[]> send = bytes =>
@@ -197,7 +197,7 @@ namespace ViscaControlVirtualCam
                 }
                 catch (Exception e)
                 {
-                    Log($"UDP send error: {e.Message}");
+                    Log($"UDP send error: {e}");
                 }
             };
             ProcessFrame(data, send);
@@ -223,7 +223,7 @@ namespace ViscaControlVirtualCam
                         }
                         catch (Exception ex)
                         {
-                            Log($"TCP client close error: {ex.Message}");
+                            Log($"TCP client close error: {ex}");
                         }
 
                         continue;
@@ -243,7 +243,7 @@ namespace ViscaControlVirtualCam
                 }
                 catch (Exception e)
                 {
-                    if (_tcp != null) Log($"TCP accept error: {e.Message}");
+                    if (_tcp != null) Log($"TCP accept error: {e}");
                 }
             }
         }
@@ -263,7 +263,7 @@ namespace ViscaControlVirtualCam
                     }
                     catch (Exception e)
                     {
-                        Log($"TCP send error: {e.Message}");
+                        Log($"TCP send error: {e}");
                     }
                 };
                 while (_cts != null && !_cts.IsCancellationRequested && client.Connected)
@@ -275,7 +275,7 @@ namespace ViscaControlVirtualCam
                     }
                     catch (Exception e)
                     {
-                        Log($"TCP read error: {e.Message}");
+                        Log($"TCP read error: {e}");
                         break;
                     }
 

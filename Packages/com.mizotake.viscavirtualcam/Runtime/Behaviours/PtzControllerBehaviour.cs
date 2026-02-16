@@ -35,8 +35,8 @@ namespace ViscaControlVirtualCam
             ApplySettings();
 
             // Capture initial transform/camera as home baseline
-            var yaw = NormalizeAngle(panPivot.localEulerAngles.y);
-            var pitch = -NormalizeAngle(tiltPivot.localEulerAngles.x);
+            var yaw = PtzMathUtils.NormalizeAngle(panPivot.localEulerAngles.y);
+            var pitch = -PtzMathUtils.NormalizeAngle(tiltPivot.localEulerAngles.x);
             var fov = targetCamera != null ? targetCamera.fieldOfView : 60f;
             Model.SetHomeBaseline(yaw, pitch, fov, Model.CurrentFocus, Model.CurrentIris);
         }
@@ -44,8 +44,8 @@ namespace ViscaControlVirtualCam
         private void Update()
         {
             var dt = Time.deltaTime;
-            var currentYaw = NormalizeAngle(panPivot.localEulerAngles.y);
-            var currentPitch = -NormalizeAngle(tiltPivot.localEulerAngles.x); // define +up
+            var currentYaw = PtzMathUtils.NormalizeAngle(panPivot.localEulerAngles.y);
+            var currentPitch = -PtzMathUtils.NormalizeAngle(tiltPivot.localEulerAngles.x); // define +up
             var currentFov = targetCamera != null ? targetCamera.fieldOfView : 60f;
 
             var step = Model.Step(currentYaw, currentPitch, currentFov, dt);
@@ -68,8 +68,8 @@ namespace ViscaControlVirtualCam
                 ApplySettings();
 
                 // Keep home baseline in sync in Editor
-                var yaw = NormalizeAngle(panPivot != null ? panPivot.localEulerAngles.y : 0f);
-                var pitch = -NormalizeAngle(tiltPivot != null ? tiltPivot.localEulerAngles.x : 0f);
+                var yaw = PtzMathUtils.NormalizeAngle(panPivot != null ? panPivot.localEulerAngles.y : 0f);
+                var pitch = -PtzMathUtils.NormalizeAngle(tiltPivot != null ? tiltPivot.localEulerAngles.x : 0f);
                 var fov = targetCamera != null ? targetCamera.fieldOfView : 60f;
                 Model.SetHomeBaseline(yaw, pitch, fov, Model.CurrentFocus, Model.CurrentIris);
             }
@@ -82,14 +82,6 @@ namespace ViscaControlVirtualCam
             if (settings != null) settings.ApplyTo(Model);
 
             if (tuningProfile != null) tuningProfile.ApplyTo(Model);
-        }
-
-        private static float NormalizeAngle(float euler)
-        {
-            var a = euler;
-            while (a > 180f) a -= 360f;
-            while (a < -180f) a += 360f;
-            return a;
         }
     }
 }

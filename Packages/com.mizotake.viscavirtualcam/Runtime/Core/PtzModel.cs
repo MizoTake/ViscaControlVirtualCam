@@ -389,7 +389,6 @@ namespace ViscaControlVirtualCam
             var result = new PtzStepResult();
             GetFovLimits(out var fovMin, out var fovMax);
 
-            // Calculate velocities with optional acceleration limiting
             var desiredPanVel = _omegaPan;
             var desiredTiltVel = _omegaTilt;
             var desiredFovVel = _omegaFov;
@@ -400,71 +399,16 @@ namespace ViscaControlVirtualCam
             var fovSnapped = false;
             var zoomScale = GetPanTiltZoomScale(currentFovDeg);
 
-            if (UseTargetBraking && _targetPanDeg.HasValue)
-            {
-                var targetYaw = PtzMathUtils.Clamp(_targetPanDeg.Value, PanMinDeg, PanMaxDeg);
-                var distance = PtzMathUtils.DeltaAngle(currentYawDeg, targetYaw);
-                if (Math.Abs(distance) <= PanStopDistanceDeg)
-                {
-                    result.DeltaYawDeg += distance;
-                    _targetPanDeg = null;
-                    _omegaPanCurrent = 0f;
-                    desiredPanVel = 0f;
-                    panSnapped = true;
-                }
-                else
-                {
-                    var speedLimit = _targetPanSpeedLimit >= 0f ? _targetPanSpeedLimit : PanMaxDegPerSec;
-                    var speedFloor = _targetPanSpeedFloor > 0f ? _targetPanSpeedFloor : 0f;
-                    desiredPanVel = ComputeBrakingVelocity(distance, PanDecelDegPerSec2, PanStopDistanceDeg,
-                        speedLimit * zoomScale, speedFloor * zoomScale);
-                }
-            }
+            // Target braking for Pan/Tilt/Zoom
+            UpdatePanTargetBraking(currentYawDeg, zoomScale, ref result, ref desiredPanVel, ref panSnapped);
+            UpdateTiltTargetBraking(currentPitchDeg, zoomScale, ref result, ref desiredTiltVel, ref tiltSnapped);
+            UpdateZoomTargetBraking(currentFovDeg, fovMin, fovMax, ref result, ref desiredFovVel, ref fovSnapped);
 
-            if (UseTargetBraking && _targetTiltDeg.HasValue)
-            {
-                var targetPitch = PtzMathUtils.Clamp(_targetTiltDeg.Value, TiltMinDeg, TiltMaxDeg);
-                var distance = targetPitch - currentPitchDeg;
-                if (Math.Abs(distance) <= TiltStopDistanceDeg)
-                {
-                    result.DeltaPitchDeg += distance;
-                    _targetTiltDeg = null;
-                    _omegaTiltCurrent = 0f;
-                    desiredTiltVel = 0f;
-                    tiltSnapped = true;
-                }
-                else
-                {
-                    var speedLimit = _targetTiltSpeedLimit >= 0f ? _targetTiltSpeedLimit : TiltMaxDegPerSec;
-                    var speedFloor = _targetTiltSpeedFloor > 0f ? _targetTiltSpeedFloor : 0f;
-                    desiredTiltVel = ComputeBrakingVelocity(distance, TiltDecelDegPerSec2, TiltStopDistanceDeg,
-                        speedLimit * zoomScale, speedFloor * zoomScale);
-                }
-            }
-
-            if (UseTargetBraking && _targetFov.HasValue)
-            {
-                var targetFov = PtzMathUtils.Clamp(_targetFov.Value, fovMin, fovMax);
-                var distance = targetFov - currentFovDeg;
-                if (Math.Abs(distance) <= ZoomStopDistanceDeg)
-                {
-                    result.NewFovDeg = targetFov;
-                    result.HasNewFov = true;
-                    _targetFov = null;
-                    _omegaFovCurrent = 0f;
-                    desiredFovVel = 0f;
-                    fovSnapped = true;
-                }
-                else
-                {
-                    desiredFovVel = ComputeBrakingVelocity(distance, ZoomDecelDegPerSec2, ZoomStopDistanceDeg,
-                        ZoomMaxFovPerSec);
-                }
-            }
-
+            // Apply zoom scale to velocities when not using target braking
             if (!UseTargetBraking || !_targetPanDeg.HasValue) desiredPanVel *= zoomScale;
             if (!UseTargetBraking || !_targetTiltDeg.HasValue) desiredTiltVel *= zoomScale;
 
+            // Apply velocity smoothing
             desiredPanVel = ApplyVelocitySmoothing(ref _panVelSmoothed, desiredPanVel, dt);
             desiredTiltVel = ApplyVelocitySmoothing(ref _tiltVelSmoothed, desiredTiltVel, dt);
             if (useZoomPositionSpeed)
@@ -472,11 +416,104 @@ namespace ViscaControlVirtualCam
             else
                 desiredFovVel = ApplyVelocitySmoothing(ref _zoomVelSmoothed, desiredFovVel, dt);
 
+            // Apply acceleration limiting and update current velocities
             var panVel = desiredPanVel;
             var tiltVel = desiredTiltVel;
             var fovVel = desiredFovVel;
             var zoomVel = desiredZoomVel;
+            ApplyAccelerationLimiting(useZoomPositionSpeed, dt, ref panVel, ref tiltVel, ref fovVel, ref zoomVel,
+                desiredPanVel, desiredTiltVel, desiredFovVel, desiredZoomVel);
 
+            // Apply velocity to result
+            ApplyPanTiltVelocity(currentYawDeg, currentPitchDeg, dt, panVel, tiltVel, panSnapped, tiltSnapped,
+                ref result);
+
+            // Update Zoom/FOV
+            UpdateZoomFov(currentFovDeg, fovMin, fovMax, dt, useZoomPositionSpeed, fovVel, zoomVel, fovSnapped,
+                ref result);
+
+            // Update Focus and Iris
+            UpdateFocus(dt);
+            UpdateIris(dt);
+
+            return result;
+        }
+
+        private void UpdatePanTargetBraking(float currentYawDeg, float zoomScale, ref PtzStepResult result,
+            ref float desiredPanVel, ref bool panSnapped)
+        {
+            if (!UseTargetBraking || !_targetPanDeg.HasValue) return;
+
+            var targetYaw = PtzMathUtils.Clamp(_targetPanDeg.Value, PanMinDeg, PanMaxDeg);
+            var distance = PtzMathUtils.DeltaAngle(currentYawDeg, targetYaw);
+            if (Math.Abs(distance) <= PanStopDistanceDeg)
+            {
+                result.DeltaYawDeg += distance;
+                _targetPanDeg = null;
+                _omegaPanCurrent = 0f;
+                desiredPanVel = 0f;
+                panSnapped = true;
+            }
+            else
+            {
+                var speedLimit = _targetPanSpeedLimit >= 0f ? _targetPanSpeedLimit : PanMaxDegPerSec;
+                var speedFloor = _targetPanSpeedFloor > 0f ? _targetPanSpeedFloor : 0f;
+                desiredPanVel = ComputeBrakingVelocity(distance, PanDecelDegPerSec2, PanStopDistanceDeg,
+                    speedLimit * zoomScale, speedFloor * zoomScale);
+            }
+        }
+
+        private void UpdateTiltTargetBraking(float currentPitchDeg, float zoomScale, ref PtzStepResult result,
+            ref float desiredTiltVel, ref bool tiltSnapped)
+        {
+            if (!UseTargetBraking || !_targetTiltDeg.HasValue) return;
+
+            var targetPitch = PtzMathUtils.Clamp(_targetTiltDeg.Value, TiltMinDeg, TiltMaxDeg);
+            var distance = targetPitch - currentPitchDeg;
+            if (Math.Abs(distance) <= TiltStopDistanceDeg)
+            {
+                result.DeltaPitchDeg += distance;
+                _targetTiltDeg = null;
+                _omegaTiltCurrent = 0f;
+                desiredTiltVel = 0f;
+                tiltSnapped = true;
+            }
+            else
+            {
+                var speedLimit = _targetTiltSpeedLimit >= 0f ? _targetTiltSpeedLimit : TiltMaxDegPerSec;
+                var speedFloor = _targetTiltSpeedFloor > 0f ? _targetTiltSpeedFloor : 0f;
+                desiredTiltVel = ComputeBrakingVelocity(distance, TiltDecelDegPerSec2, TiltStopDistanceDeg,
+                    speedLimit * zoomScale, speedFloor * zoomScale);
+            }
+        }
+
+        private void UpdateZoomTargetBraking(float currentFovDeg, float fovMin, float fovMax, ref PtzStepResult result,
+            ref float desiredFovVel, ref bool fovSnapped)
+        {
+            if (!UseTargetBraking || !_targetFov.HasValue) return;
+
+            var targetFov = PtzMathUtils.Clamp(_targetFov.Value, fovMin, fovMax);
+            var distance = targetFov - currentFovDeg;
+            if (Math.Abs(distance) <= ZoomStopDistanceDeg)
+            {
+                result.NewFovDeg = targetFov;
+                result.HasNewFov = true;
+                _targetFov = null;
+                _omegaFovCurrent = 0f;
+                desiredFovVel = 0f;
+                fovSnapped = true;
+            }
+            else
+            {
+                desiredFovVel = ComputeBrakingVelocity(distance, ZoomDecelDegPerSec2, ZoomStopDistanceDeg,
+                    ZoomMaxFovPerSec);
+            }
+        }
+
+        private void ApplyAccelerationLimiting(bool useZoomPositionSpeed, float dt,
+            ref float panVel, ref float tiltVel, ref float fovVel, ref float zoomVel,
+            float desiredPanVel, float desiredTiltVel, float desiredFovVel, float desiredZoomVel)
+        {
             if (UseAccelerationLimit)
             {
                 panVel = ApplyAccelLimit(_omegaPanCurrent, desiredPanVel, PanAccelDegPerSec2, PanDecelDegPerSec2, dt);
@@ -515,12 +552,16 @@ namespace ViscaControlVirtualCam
                     _omegaZoomCurrent = 0f;
                 }
             }
+        }
 
+        private void ApplyPanTiltVelocity(float currentYawDeg, float currentPitchDeg, float dt,
+            float panVel, float tiltVel, bool panSnapped, bool tiltSnapped, ref PtzStepResult result)
+        {
             // Apply velocity
             if (!panSnapped) result.DeltaYawDeg += panVel * dt;
             if (!tiltSnapped) result.DeltaPitchDeg += tiltVel * dt;
 
-            // Apply absolute positioning with damping
+            // Apply absolute positioning with damping (when not using target braking)
             if (!UseTargetBraking && _targetPanDeg.HasValue)
             {
                 var targetYaw = PtzMathUtils.Clamp(_targetPanDeg.Value, PanMinDeg, PanMaxDeg);
@@ -538,8 +579,11 @@ namespace ViscaControlVirtualCam
                 result.DeltaPitchDeg += delta;
                 if (Math.Abs(newPitch - targetPitch) < 0.1f) _targetTiltDeg = null;
             }
+        }
 
-            // Zoom/FOV
+        private void UpdateZoomFov(float currentFovDeg, float fovMin, float fovMax, float dt,
+            bool useZoomPositionSpeed, float fovVel, float zoomVel, bool fovSnapped, ref PtzStepResult result)
+        {
             var newFov = currentFovDeg;
             if (useZoomPositionSpeed)
             {
@@ -564,8 +608,10 @@ namespace ViscaControlVirtualCam
                 result.NewFovDeg = newFov;
                 result.HasNewFov = true;
             }
+        }
 
-            // Focus
+        private void UpdateFocus(float dt)
+        {
             CurrentFocus += _omegaFocus * dt;
             if (_targetFocus.HasValue)
             {
@@ -575,8 +621,10 @@ namespace ViscaControlVirtualCam
             }
 
             CurrentFocus = PtzMathUtils.Clamp(CurrentFocus, FocusMin, FocusMax);
+        }
 
-            // Iris
+        private void UpdateIris(float dt)
+        {
             CurrentIris += _omegaIris * dt;
             if (_targetIris.HasValue)
             {
@@ -586,8 +634,6 @@ namespace ViscaControlVirtualCam
             }
 
             CurrentIris = PtzMathUtils.Clamp(CurrentIris, IrisMin, IrisMax);
-
-            return result;
         }
 
         #endregion
