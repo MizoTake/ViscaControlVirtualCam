@@ -10,7 +10,10 @@ namespace ViscaControlVirtualCam.Editor
         private SerializedProperty logLevel;
         private SerializedProperty logReceivedCommands;
         private SerializedProperty maxClients;
+        private SerializedProperty operationMode;
         private SerializedProperty ptzController;
+        private SerializedProperty realCameraIp;
+        private SerializedProperty realCameraPort;
         private SerializedProperty replyMode;
         private SerializedProperty tcpPort;
         private SerializedProperty transport;
@@ -25,6 +28,9 @@ namespace ViscaControlVirtualCam.Editor
             tcpPort = serializedObject.FindProperty("tcpPort");
             maxClients = serializedObject.FindProperty("maxClients");
             replyMode = serializedObject.FindProperty("replyMode");
+            operationMode = serializedObject.FindProperty("operationMode");
+            realCameraIp = serializedObject.FindProperty("realCameraIp");
+            realCameraPort = serializedObject.FindProperty("realCameraPort");
             verboseLog = serializedObject.FindProperty("verboseLog");
             logReceivedCommands = serializedObject.FindProperty("logReceivedCommands");
             logLevel = serializedObject.FindProperty("logLevel");
@@ -43,6 +49,13 @@ namespace ViscaControlVirtualCam.Editor
             EditorGUILayout.PropertyField(tcpPort);
             EditorGUILayout.PropertyField(maxClients);
             EditorGUILayout.PropertyField(replyMode);
+            EditorGUILayout.PropertyField(operationMode);
+
+            if ((ViscaOperationMode)operationMode.enumValueIndex != ViscaOperationMode.VirtualOnly)
+            {
+                EditorGUILayout.PropertyField(realCameraIp);
+                EditorGUILayout.PropertyField(realCameraPort);
+            }
 
             EditorGUILayout.Space();
 

@@ -7,6 +7,7 @@ Blackmagic PTZ Controlに対応したVISCA互換PTZバーチャルカメラサ�
 ### コア機能
 - **Pure C# 実装**: コアロジックにUnity依存なし
 - **VISCA プロトコル対応**: UDP/TCP経由の標準VISCA（Raw VISCA）
+- **VISCA Forwarding**: 仮想カメラと実機カメラへの同時/単独ルーティング
 - **Blackmagic PTZ Control**: ATEM スイッチャー向け拡張サポート
 - **永続的メモリプリセット**: PlayerPrefsを使ったカメラ位置の保存/呼び出し
 - **拡張可能なコマンドシステム**: インターフェースベースのアーキテクチャでカスタムコマンド追加が容易
@@ -55,6 +56,11 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 
 ### 2. 設定
 - **ViscaServerBehaviour**: ネットワーク設定（UDP/TCPポート、ログ）
+- **Operation Mode**:
+  - `VirtualOnly`: Unityのみ制御（既存動作）
+  - `RealOnly`: 実機へ転送し、実機応答をリレー
+  - `Linked`: Unityと実機を同時制御（応答は実機のみリレー）
+- **Real Camera Forwarding**: 実機IP/UDPポート（既定 `192.168.1.10:52381`）
 - **PtzControllerBehaviour**: メモリの永続化、カメラの可動範囲
 - **PtzSettings**: 速度カーブ、移動の減衰、FOV範囲、Pan/Tilt反転（速度/絶対位置別）、望遠時の速度抑制
 - **PtzSettings 追加項目**: 最小速度・プリセット速度・スローパン/チルト・レンズプロファイル（センサー/焦点距離）・ズーム位置速度モード

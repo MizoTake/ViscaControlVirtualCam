@@ -8,6 +8,8 @@ namespace ViscaControlVirtualCam
     [DefaultExecutionOrder(-50)]
     public class ViscaServerBehaviour : MonoBehaviour
     {
+        private static readonly Action<byte[]> NoOpResponder = _ => { };
+
         [Header("Server")] public bool autoStart = true;
 
         public ViscaTransport transport = ViscaTransport.UdpRawVisca;
@@ -16,6 +18,13 @@ namespace ViscaControlVirtualCam
         public int maxClients = 4;
         public ViscaReplyMode replyMode = ViscaReplyMode.AckAndCompletion;
         [Min(1)] public int pendingQueueLimit = 64;
+
+        [Header("Operation Mode")] public ViscaOperationMode operationMode = ViscaOperationMode.VirtualOnly;
+
+        [Header("Real Camera Forwarding")] public string realCameraIp = "192.168.1.10";
+
+        [Min(1)]
+        public int realCameraPort = 52381;
 
         [Header("Logging")] [Tooltip("Enable general logging (connection events, errors, etc.)")]
         public bool verboseLog = true;
@@ -30,6 +39,7 @@ namespace ViscaControlVirtualCam
 
         private readonly ConcurrentQueue<Action> _mainThreadActions = new();
         private ViscaServerCore _core;
+        private ViscaForwarder _forwarder;
 
         private void Awake()
         {
@@ -70,6 +80,39 @@ namespace ViscaControlVirtualCam
 
             var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode,
                 msg => LogMessage(msg), pendingQueueLimit);
+            Func<byte[], Action<byte[]>, Action<byte[]>> interceptor = null;
+
+            if (operationMode != ViscaOperationMode.VirtualOnly)
+            {
+                try
+                {
+                    _forwarder = new ViscaForwarder(realCameraIp, realCameraPort, msg => LogMessage(msg));
+                    _forwarder.Start();
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[VISCA] Failed to start forwarder: {e.Message}");
+                    _forwarder?.Dispose();
+                    _forwarder = null;
+                    return;
+                }
+
+                interceptor = operationMode switch
+                {
+                    ViscaOperationMode.RealOnly => (packet, originalResponder) =>
+                    {
+                        _forwarder?.Forward(packet, originalResponder);
+                        return null;
+                    },
+                    ViscaOperationMode.Linked => (packet, originalResponder) =>
+                    {
+                        _forwarder?.Forward(packet, originalResponder);
+                        return NoOpResponder;
+                    },
+                    _ => null
+                };
+            }
+
             var opt = new ViscaServerOptions
             {
                 Transport = transport,
@@ -78,10 +121,20 @@ namespace ViscaControlVirtualCam
                 MaxClients = maxClients,
                 VerboseLog = verboseLog,
                 LogReceivedCommands = logReceivedCommands,
-                Logger = msg => LogMessage(msg)
+                Logger = msg => LogMessage(msg),
+                ProcessingInterceptor = interceptor
             };
             _core = new ViscaServerCore(handler, opt);
-            _core.Start();
+            try
+            {
+                _core.Start();
+            }
+            catch
+            {
+                _forwarder?.Dispose();
+                _forwarder = null;
+                throw;
+            }
         }
 
         private void LogMessage(string message)
@@ -138,6 +191,18 @@ namespace ViscaControlVirtualCam
             }
 
             _core = null;
+
+            try
+            {
+                _forwarder?.Stop();
+                _forwarder?.Dispose();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[VISCA] Forwarder stop error: {e.Message}");
+            }
+
+            _forwarder = null;
         }
     }
 }

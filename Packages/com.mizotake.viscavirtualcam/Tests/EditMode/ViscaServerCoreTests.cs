@@ -368,6 +368,48 @@ public class ViscaServerCoreTests
         Assert.Pass("Null frame handled without exception");
     }
 
+    [Test]
+    public void ProcessFrame_InterceptorReturnsNull_SkipsLocalProcessing()
+    {
+        var receivedContexts = new List<ViscaCommandContext>();
+        var handler = new RecordingHandler(receivedContexts);
+        var server = new ViscaServerCore(handler, new ViscaServerOptions
+        {
+            VerboseLog = false,
+            LogReceivedCommands = false,
+            ProcessingInterceptor = (_, _) => null
+        });
+        var sent = new List<byte[]>();
+
+        byte[] frame = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x01, 0xFF };
+        InvokeProcessFrame(server, frame, sent);
+        server.Dispose();
+
+        Assert.AreEqual(0, receivedContexts.Count, "Local command handling should be skipped");
+        Assert.AreEqual(0, sent.Count, "Original responder should not be called");
+    }
+
+    [Test]
+    public void ProcessFrame_InterceptorReplacesResponder_UsesReplacementResponder()
+    {
+        var handler = new StubHandler();
+        var intercepted = new List<byte[]>();
+        var server = new ViscaServerCore(handler, new ViscaServerOptions
+        {
+            VerboseLog = false,
+            LogReceivedCommands = false,
+            ProcessingInterceptor = (_, _) => bytes => intercepted.Add(bytes)
+        });
+        var originalResponderSent = new List<byte[]>();
+
+        byte[] frame = { 0x81, 0x01, 0x04, 0x3F, 0x02, 0x01, 0xFF };
+        InvokeProcessFrame(server, frame, originalResponderSent);
+        server.Dispose();
+
+        Assert.AreEqual(0, originalResponderSent.Count, "Original responder should be suppressed");
+        Assert.AreEqual(2, intercepted.Count, "Replacement responder should receive ACK and Completion");
+    }
+
     #endregion
 
     #region Multiple Commands Sequence Tests

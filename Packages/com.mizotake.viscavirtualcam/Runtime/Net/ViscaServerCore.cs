@@ -19,6 +19,13 @@ namespace ViscaControlVirtualCam
         public ViscaTransport Transport = ViscaTransport.UdpRawVisca;
         public int UdpPort = ViscaProtocol.DefaultUdpPort;
         public bool VerboseLog = true;
+
+        /// <summary>
+        ///     Interceptor for raw packet processing.
+        ///     Args: (rawPacket, originalResponder)
+        ///     Return: responder used for local processing. Return null to skip local processing.
+        /// </summary>
+        public Func<byte[], Action<byte[]>, Action<byte[]>> ProcessingInterceptor = null;
     }
 
     /// <summary>
@@ -302,6 +309,12 @@ namespace ViscaControlVirtualCam
         private void ProcessFrame(byte[] packet, Action<byte[]> rawSend)
         {
             if (packet == null || packet.Length == 0) return;
+
+            if (_opt.ProcessingInterceptor != null)
+            {
+                rawSend = _opt.ProcessingInterceptor(packet, rawSend);
+                if (rawSend == null) return;
+            }
 
             var frame = packet;
             var responder = rawSend;

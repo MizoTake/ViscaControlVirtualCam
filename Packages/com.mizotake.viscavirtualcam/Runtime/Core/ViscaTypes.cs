@@ -18,6 +18,13 @@ namespace ViscaControlVirtualCam
         AckAndCompletion
     }
 
+    public enum ViscaOperationMode
+    {
+        VirtualOnly,
+        RealOnly,
+        Linked
+    }
+
     public enum AxisDirection
     {
         Negative = -1,
