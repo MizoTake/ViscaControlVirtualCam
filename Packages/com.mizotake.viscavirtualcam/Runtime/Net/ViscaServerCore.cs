@@ -11,6 +11,7 @@ namespace ViscaControlVirtualCam
     /// </summary>
     public sealed class ViscaServerOptions
     {
+        public IPAddress BindAddress = IPAddress.Any;
         public Action<string> Logger = null;
         public bool LogReceivedCommands = true;
         public int MaxClients = 4;
@@ -130,7 +131,8 @@ namespace ViscaControlVirtualCam
 
         private void StartUdp()
         {
-            _udp = new UdpClient(_opt.UdpPort);
+            var bindAddress = _opt.BindAddress ?? IPAddress.Any;
+            _udp = new UdpClient(new IPEndPoint(bindAddress, _opt.UdpPort));
             _udp.Client.ReceiveBufferSize = 64 * 1024;
             try
             {
@@ -142,15 +144,16 @@ namespace ViscaControlVirtualCam
                 throw;
             }
 
-            Log($"VISCA UDP server started on {_opt.UdpPort}");
+            Log($"VISCA UDP server started on {bindAddress}:{_opt.UdpPort}");
         }
 
         private void StartTcp()
         {
-            _tcp = new TcpListener(IPAddress.Any, _opt.TcpPort);
+            var bindAddress = _opt.BindAddress ?? IPAddress.Any;
+            _tcp = new TcpListener(bindAddress, _opt.TcpPort);
             _tcp.Start();
             ThreadPool.QueueUserWorkItem(_ => AcceptLoopTcp());
-            Log($"VISCA TCP server started on {_opt.TcpPort}");
+            Log($"VISCA TCP server started on {bindAddress}:{_opt.TcpPort}");
         }
 
         private void UdpReceiveCallback(IAsyncResult ar)

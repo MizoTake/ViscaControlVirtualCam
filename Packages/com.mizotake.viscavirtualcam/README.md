@@ -56,6 +56,7 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 
 ### 2. 設定
 - **ViscaServerBehaviour**: ネットワーク設定（UDP/TCPポート、ログ）
+- **Bind Address**: サーバー待受IP（例: `0.0.0.0`, `127.0.0.1`, NICの固定IP）
 - **Operation Mode**:
   - `VirtualOnly`: Unityのみ制御（既存動作）
   - `RealOnly`: 実機へ転送し、実機応答をリレー

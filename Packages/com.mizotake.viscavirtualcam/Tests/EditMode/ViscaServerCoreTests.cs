@@ -10,6 +10,14 @@ using ViscaControlVirtualCam;
 
 public class ViscaServerCoreTests
 {
+    [Test]
+    public void ViscaServerOptions_DefaultBindAddress_IsAny()
+    {
+        var options = new ViscaServerOptions();
+
+        Assert.AreEqual(IPAddress.Any, options.BindAddress);
+    }
+
     #region ProcessFrame Tests (Existing)
     [Test]
     public void ViscaIp_InvalidLength_ReturnsMessageLengthError()

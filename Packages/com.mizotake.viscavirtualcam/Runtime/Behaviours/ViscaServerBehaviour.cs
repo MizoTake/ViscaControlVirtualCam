@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Concurrent;
+using System.Net;
 using UnityEngine;
 
 namespace ViscaControlVirtualCam
@@ -13,6 +14,8 @@ namespace ViscaControlVirtualCam
         [Header("Server")] public bool autoStart = true;
 
         public ViscaTransport transport = ViscaTransport.UdpRawVisca;
+        [Tooltip("Server bind address (e.g. 0.0.0.0, 127.0.0.1, specific NIC address)")]
+        public string bindAddress = "0.0.0.0";
         public int udpPort = 52381;
         public int tcpPort = 52380;
         public int maxClients = 4;
@@ -78,6 +81,11 @@ namespace ViscaControlVirtualCam
                 return;
             }
 
+            if (!TryParseBindAddress(out var bindIpAddress))
+            {
+                return;
+            }
+
             var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode,
                 msg => LogMessage(msg), pendingQueueLimit);
             Func<byte[], Action<byte[]>, Action<byte[]>> interceptor = null;
@@ -116,6 +124,7 @@ namespace ViscaControlVirtualCam
             var opt = new ViscaServerOptions
             {
                 Transport = transport,
+                BindAddress = bindIpAddress,
                 UdpPort = udpPort,
                 TcpPort = tcpPort,
                 MaxClients = maxClients,
@@ -203,6 +212,18 @@ namespace ViscaControlVirtualCam
             }
 
             _forwarder = null;
+        }
+
+        private bool TryParseBindAddress(out IPAddress address)
+        {
+            var value = string.IsNullOrWhiteSpace(bindAddress) ? IPAddress.Any.ToString() : bindAddress.Trim();
+            if (!IPAddress.TryParse(value, out address))
+            {
+                Debug.LogError($"[VISCA] Invalid bindAddress: '{bindAddress}'. Use IP format like 0.0.0.0 or 127.0.0.1.");
+                return false;
+            }
+
+            return true;
         }
     }
 }

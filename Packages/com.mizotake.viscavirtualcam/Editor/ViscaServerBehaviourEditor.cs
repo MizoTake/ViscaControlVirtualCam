@@ -7,6 +7,7 @@ namespace ViscaControlVirtualCam.Editor
     public class ViscaServerBehaviourEditor : UnityEditor.Editor
     {
         private SerializedProperty autoStart;
+        private SerializedProperty bindAddress;
         private SerializedProperty logLevel;
         private SerializedProperty logReceivedCommands;
         private SerializedProperty maxClients;
@@ -24,6 +25,7 @@ namespace ViscaControlVirtualCam.Editor
         {
             autoStart = serializedObject.FindProperty("autoStart");
             transport = serializedObject.FindProperty("transport");
+            bindAddress = serializedObject.FindProperty("bindAddress");
             udpPort = serializedObject.FindProperty("udpPort");
             tcpPort = serializedObject.FindProperty("tcpPort");
             maxClients = serializedObject.FindProperty("maxClients");
@@ -45,6 +47,7 @@ namespace ViscaControlVirtualCam.Editor
             EditorGUILayout.LabelField("Server", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(autoStart);
             EditorGUILayout.PropertyField(transport);
+            EditorGUILayout.PropertyField(bindAddress);
             EditorGUILayout.PropertyField(udpPort);
             EditorGUILayout.PropertyField(tcpPort);
             EditorGUILayout.PropertyField(maxClients);
