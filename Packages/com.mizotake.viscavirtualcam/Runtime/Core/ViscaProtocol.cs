@@ -88,7 +88,7 @@ namespace ViscaControlVirtualCam
 
         // Default network ports
         public const int DefaultUdpPort = 52381;
-        public const int DefaultTcpPort = 52380;
+        public const int DefaultTcpPort = 52381; // Sony VISCA over IP standard port
 
         // Math constants
         /// <summary>

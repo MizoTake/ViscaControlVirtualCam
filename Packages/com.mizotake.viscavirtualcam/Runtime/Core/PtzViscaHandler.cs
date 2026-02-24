@@ -64,6 +64,7 @@ namespace ViscaControlVirtualCam
                 ViscaCommandType.ZoomPositionInquiry => HandleZoomPositionInquiry(ctx),
                 ViscaCommandType.FocusPositionInquiry => HandleFocusPositionInquiry(ctx),
                 ViscaCommandType.FocusModeInquiry => HandleFocusModeInquiry(ctx),
+                ViscaCommandType.VersionInquiry => HandleVersionInquiry(ctx),
 
                 // Control commands
                 ViscaCommandType.CommandCancel => HandleCommandCancel(ctx),
@@ -273,6 +274,14 @@ namespace ViscaControlVirtualCam
         private bool HandleFocusModeInquiry(in ViscaCommandContext ctx)
         {
             ViscaResponse.SendInquiryResponse8(ctx.Responder, _focusMode, ctx.SocketId);
+            return true;
+        }
+
+        private bool HandleVersionInquiry(in ViscaCommandContext ctx)
+        {
+            // Dummy version response compatible with Sony VISCA over IP spec:
+            // 90 50 [vendor 2B] [model 2B] FF  →  device type = 0x0001, ROM ver = 0x0001
+            ctx.Responder(new byte[] { 0x90, 0x50, 0x00, 0x01, 0x00, 0x01, 0xFF });
             return true;
         }
 

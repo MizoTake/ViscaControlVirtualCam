@@ -194,6 +194,10 @@ namespace ViscaControlVirtualCam
             // Focus Mode Inquiry: 8X 09 04 38 FF
             Register(0x09, 0x04, 0x38, ViscaCommandType.FocusModeInquiry, "FocusModeInquiry",
                 (frame, responder) => ViscaCommandContext.FocusModeInquiry(frame, responder));
+
+            // Version Inquiry: 8X 09 00 02 FF (Sony VISCA over IP standard, sent by RM-IP500 on connect)
+            Register(0x09, 0x00, 0x02, ViscaCommandType.VersionInquiry, "VersionInquiry",
+                (frame, responder) => ViscaCommandContext.VersionInquiry(frame, responder));
         }
 
         /// <summary>

@@ -17,7 +17,7 @@ namespace ViscaControlVirtualCam
         [Tooltip("Server bind address (e.g. 0.0.0.0, 127.0.0.1, specific NIC address)")]
         public string bindAddress = "0.0.0.0";
         public int udpPort = 52381;
-        public int tcpPort = 52380;
+        public int tcpPort = 52381;
         public int maxClients = 4;
         public ViscaReplyMode replyMode = ViscaReplyMode.AckAndCompletion;
         [Min(1)] public int pendingQueueLimit = 64;

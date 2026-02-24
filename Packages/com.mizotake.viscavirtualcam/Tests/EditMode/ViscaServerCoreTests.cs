@@ -317,7 +317,7 @@ public class ViscaServerCoreTests
     }
 
     [Test]
-    public void ProcessFrame_UnknownCommand_ReturnsSyntaxError()
+    public void ProcessFrame_UnknownCommand_RespondsWithAckAndCompletion()
     {
         var handler = new StubHandler();
         var server = new ViscaServerCore(handler, new ViscaServerOptions
@@ -327,15 +327,16 @@ public class ViscaServerCoreTests
         });
         var sent = new List<byte[]>();
 
-        // Unknown command pattern
+        // Unknown command pattern — should be acknowledged gracefully (Sony VISCA over IP spec)
         byte[] frame = { 0x81, 0x99, 0x99, 0xFF };
         InvokeProcessFrame(server, frame, sent);
         server.Dispose();
 
-        Assert.AreEqual(1, sent.Count, "Should respond once");
-        var resp = sent[0];
-        Assert.AreEqual(0x90, resp[0]);
-        Assert.AreEqual(ViscaProtocol.ErrorSyntax, resp[2]);
+        Assert.AreEqual(2, sent.Count, "Should respond with ACK and Completion");
+        // ACK: 90 41 FF (socket 1)
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x41, 0xFF }, sent[0]);
+        // Completion: 90 51 FF (socket 1)
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x51, 0xFF }, sent[1]);
     }
 
     [Test]
@@ -374,6 +375,64 @@ public class ViscaServerCoreTests
 
         // Should not crash
         Assert.Pass("Null frame handled without exception");
+    }
+
+    #endregion
+
+    #region Sony VISCA over IP Tests
+
+    [Test]
+    public void ProcessFrame_VersionInquiry_RespondsWithVersionData()
+    {
+        var receivedContexts = new List<ViscaCommandContext>();
+        var handler = new RecordingHandler(receivedContexts);
+        var server = new ViscaServerCore(handler, new ViscaServerOptions
+        {
+            VerboseLog = false,
+            LogReceivedCommands = false
+        });
+        var sent = new List<byte[]>();
+
+        // Version Inquiry: 81 09 00 02 FF (Sony RM-IP500 sends this on connect)
+        byte[] frame = { 0x81, 0x09, 0x00, 0x02, 0xFF };
+        InvokeProcessFrame(server, frame, sent);
+        server.Dispose();
+
+        Assert.AreEqual(1, receivedContexts.Count, "Should parse as VersionInquiry");
+        Assert.AreEqual(ViscaCommandType.VersionInquiry, receivedContexts[0].CommandType);
+    }
+
+    [Test]
+    public void ProcessFrame_VersionInquiry_WithViscaIpHeader_RespondsWithVersionData()
+    {
+        var sent = new List<byte[]>();
+        // Use a real PtzViscaHandler-like handler that actually sends responses
+        var handler = new VersionInquiryHandler();
+        var server = new ViscaServerCore(handler, new ViscaServerOptions
+        {
+            VerboseLog = false,
+            LogReceivedCommands = false
+        });
+
+        // Version Inquiry wrapped in Sony VISCA-IP header (sequence = 1)
+        byte[] payload = { 0x81, 0x09, 0x00, 0x02, 0xFF };
+        var packet = BuildViscaIpPacket(0x01, 0x10, (ushort)payload.Length, 0x00000001u, payload);
+        InvokeProcessFrame(server, packet, sent);
+        server.Dispose();
+
+        Assert.AreEqual(1, sent.Count, "Should respond once");
+        var resp = sent[0];
+
+        // Verify VISCA-IP wrapper: 01 11 00 07 00 00 00 01 [payload]
+        Assert.AreEqual(0x01, resp[0], "TypeMsb = VISCA");
+        Assert.AreEqual(0x11, resp[1], "TypeLsb = Reply");
+        Assert.AreEqual(0x00, resp[2]);
+        Assert.AreEqual(0x07, resp[3], "Payload length = 7 bytes");
+        CollectionAssert.AreEqual(new byte[] { 0x00, 0x00, 0x00, 0x01 }, resp.Skip(4).Take(4).ToArray(), "Sequence echoed");
+
+        // Verify version response payload: 90 50 00 01 00 01 FF
+        var responsePayload = resp.Skip(8).ToArray();
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x50, 0x00, 0x01, 0x00, 0x01, 0xFF }, responsePayload);
     }
 
     [Test]
@@ -860,6 +919,30 @@ public class ViscaServerCoreTests
         public bool Handle(in ViscaCommandContext context)
         {
             _onHandle?.Invoke();
+            return true;
+        }
+
+        public void HandleError(byte[] frame, Action<byte[]> responder, byte errorCode)
+        {
+            ViscaResponse.SendError(responder, errorCode, ViscaProtocol.ExtractSocketId(frame));
+        }
+    }
+
+    /// <summary>
+    ///     Handler that mimics PtzViscaHandler's VersionInquiry response for integration tests.
+    /// </summary>
+    private sealed class VersionInquiryHandler : IViscaCommandHandler
+    {
+        public bool Handle(in ViscaCommandContext context)
+        {
+            if (context.CommandType == ViscaCommandType.VersionInquiry)
+            {
+                context.Responder(new byte[] { 0x90, 0x50, 0x00, 0x01, 0x00, 0x01, 0xFF });
+                return true;
+            }
+
+            ViscaResponse.SendAck(context.Responder, ViscaReplyMode.AckAndCompletion, context.SocketId);
+            ViscaResponse.SendCompletion(context.Responder, ViscaReplyMode.AckAndCompletion, context.SocketId);
             return true;
         }
 

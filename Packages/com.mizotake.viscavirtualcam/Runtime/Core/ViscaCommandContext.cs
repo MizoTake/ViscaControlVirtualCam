@@ -39,6 +39,7 @@ namespace ViscaControlVirtualCam
         ZoomPositionInquiry,
         FocusPositionInquiry,
         FocusModeInquiry,
+        VersionInquiry,
 
         // Control commands
         CommandCancel
@@ -271,6 +272,11 @@ namespace ViscaControlVirtualCam
             return new ViscaCommandContext(ViscaCommandType.FocusModeInquiry, frame, responder, GetSocketId(frame));
         }
 
+        public static ViscaCommandContext VersionInquiry(byte[] frame, Action<byte[]> responder)
+        {
+            return new ViscaCommandContext(ViscaCommandType.VersionInquiry, frame, responder, GetSocketId(frame));
+        }
+
         public static ViscaCommandContext CommandCancel(byte[] frame, Action<byte[]> responder)
         {
             return new ViscaCommandContext(ViscaCommandType.CommandCancel, frame, responder, GetSocketId(frame));
@@ -314,6 +320,7 @@ namespace ViscaControlVirtualCam
                 ViscaCommandType.ZoomPositionInquiry => "ZoomPositionInquiry",
                 ViscaCommandType.FocusPositionInquiry => "FocusPositionInquiry",
                 ViscaCommandType.FocusModeInquiry => "FocusModeInquiry",
+                ViscaCommandType.VersionInquiry => "VersionInquiry",
                 ViscaCommandType.CommandCancel => "CommandCancel",
                 _ => $"Unknown [{BitConverter.ToString(Frame)}]"
             };
