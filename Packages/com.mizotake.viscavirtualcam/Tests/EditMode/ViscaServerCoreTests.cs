@@ -430,9 +430,33 @@ public class ViscaServerCoreTests
         Assert.AreEqual(0x07, resp[3], "Payload length = 7 bytes");
         CollectionAssert.AreEqual(new byte[] { 0x00, 0x00, 0x00, 0x01 }, resp.Skip(4).Take(4).ToArray(), "Sequence echoed");
 
-        // Verify version response payload: 90 50 00 01 00 01 FF
+        // Verify version response payload: 90 51 00 01 00 01 FF (socket 1 → completion = 0x51)
         var responsePayload = resp.Skip(8).ToArray();
-        CollectionAssert.AreEqual(new byte[] { 0x90, 0x50, 0x00, 0x01, 0x00, 0x01, 0xFF }, responsePayload);
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x51, 0x00, 0x01, 0x00, 0x01, 0xFF }, responsePayload);
+    }
+
+    [Test]
+    public void ProcessFrame_MalformedKnownCommand_ReturnsError()
+    {
+        var handler = new StubHandler();
+        var server = new ViscaServerCore(handler, new ViscaServerOptions
+        {
+            VerboseLog = false,
+            LogReceivedCommands = false
+        });
+        var sent = new List<byte[]>();
+
+        // PanTiltDrive key matches (81 01 06 01) but frame is truncated — parser returns null
+        byte[] frame = { 0x81, 0x01, 0x06, 0x01, 0xFF }; // too short (needs 9 bytes)
+        InvokeProcessFrame(server, frame, sent);
+        server.Dispose();
+
+        Assert.AreEqual(1, sent.Count, "Should respond once with error");
+        var resp = sent[0];
+        Assert.AreEqual(0x90, resp[0]);
+        Assert.AreEqual(ViscaProtocol.ResponseError | 0x01, resp[1]); // socket 1
+        Assert.AreEqual(ViscaProtocol.ErrorMessageLength, resp[2]);
+        Assert.AreEqual(0xFF, resp[3]);
     }
 
     [Test]
@@ -937,7 +961,8 @@ public class ViscaServerCoreTests
         {
             if (context.CommandType == ViscaCommandType.VersionInquiry)
             {
-                context.Responder(new byte[] { 0x90, 0x50, 0x00, 0x01, 0x00, 0x01, 0xFF });
+                var completion = (byte)(ViscaProtocol.ResponseCompletion | (context.SocketId & 0x0F));
+                context.Responder(new byte[] { 0x90, completion, 0x00, 0x01, 0x00, 0x01, ViscaProtocol.FrameTerminator });
                 return true;
             }
 

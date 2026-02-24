@@ -260,6 +260,17 @@ namespace ViscaControlVirtualCam
         }
 
         /// <summary>
+        ///     Returns true if the command key in the frame is registered (even if the frame is malformed).
+        ///     Used to distinguish truly unknown commands from malformed known commands.
+        /// </summary>
+        public bool IsKnownCommandKey(byte[] frame)
+        {
+            if (frame == null || frame.Length < 4) return false;
+            var key = (frame[1] << 16) | (frame[2] << 8) | frame[3];
+            return _commandsByKey.ContainsKey(key);
+        }
+
+        /// <summary>
         ///     Get command name for logging (O(1) for known commands)
         /// </summary>
         public string GetCommandName(byte[] frame)

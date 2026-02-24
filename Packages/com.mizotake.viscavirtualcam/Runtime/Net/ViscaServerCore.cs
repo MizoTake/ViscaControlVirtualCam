@@ -382,12 +382,21 @@ namespace ViscaControlVirtualCam
             var context = CommandRegistry.TryExecute(frame, _handler, responder);
             if (context.HasValue) return;
 
-            // Unknown command - acknowledge gracefully per Sony VISCA over IP spec
             var cmdName = CommandRegistry.GetCommandName(frame);
-            Log($"Unknown command (ignored): {cmdName}");
-            var unknownSocketId = ViscaProtocol.ExtractSocketId(frame);
-            ViscaResponse.SendAck(responder, ViscaReplyMode.AckAndCompletion, unknownSocketId);
-            ViscaResponse.SendCompletion(responder, ViscaReplyMode.AckAndCompletion, unknownSocketId);
+            if (CommandRegistry.IsKnownCommandKey(frame))
+            {
+                // Known command key but parser rejected the frame (e.g. truncated payload) — report error
+                Log($"Malformed frame for known command: {cmdName}");
+                _handler.HandleError(frame, responder, ViscaProtocol.ErrorMessageLength);
+            }
+            else
+            {
+                // Truly unknown command — acknowledge gracefully per Sony VISCA over IP spec
+                Log($"Unknown command (ignored): {cmdName}");
+                var unknownSocketId = ViscaProtocol.ExtractSocketId(frame);
+                ViscaResponse.SendAck(responder, ViscaReplyMode.AckAndCompletion, unknownSocketId);
+                ViscaResponse.SendCompletion(responder, ViscaReplyMode.AckAndCompletion, unknownSocketId);
+            }
         }
 
         private bool TryParseViscaIpEnvelope(byte[] packet, out ViscaIpEnvelope envelope, out byte[] payload,
