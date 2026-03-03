@@ -1,69 +1,76 @@
-# IP Setup Protocol Responder (UDP 52380)
+﻿# Sony IP Setup 対応仕様（RM-IP500 Auto Assign）
 
-## 概要
+## 1. 目的
 
-`IpSetupResponder` は RM-IP500 の AUTO IP SETUP / Auto Assign 向けの探索応答機能です。  
-OS の IP 設定変更は行わず、設定は Unity の Inspector 上で管理します。
+RM-IP500 の Auto Assign で、ViscaControlVirtualCam を実機同様の流れで登録できる状態にする。
 
-- Discovery / Assign: UDP `52380`
-- VISCA Control: UDP `52381`
+## 2. 通信仕様
 
-## 構成
+- Protocol: Sony IP Setup Protocol
+- Transport: UDP
+- Port: `52380`
+- Discovery destination: `255.255.255.255`
+- Frame: `STX(0x02)` + unit 群（`0xFF` 区切り）+ `ETX(0x03)`
 
-- `IpSetupResponder`: UDP 52380 受信、ENQ/SET 応答、デバウンス、返信モード制御
-- `VirtualDeviceIdentity`: `virtualMac` / `modelName` / `serial` / `softVersion` / `webPort` / `friendlyName`
-- `VirtualNetworkConfig`: `logicalIp` / `logicalMask` / `logicalGateway`
+## 3. 実装済みフロー（実機準拠）
 
-## フレーム形式
+1. `ENQ:network` を受信
+2. `INFO:network` 応答（固定順）
+3. `SETMAC:<mac>` を受信
+4. `ACK:<mac>` 応答（1 unit のみ）
+5. RM-IP500 が VISCA(`52381`) 開始
 
-- `STX = 0x02` で開始
-- `ETX = 0x03` で終了
-- unit は `0xFF` 区切り
-- unit は ASCII テキスト（例: `ENQ:allinfo`, `SETMAC:02:...`）
+## 4. ENQ:network 応答
 
-## 応答仕様
+応答 unit は以下の固定順:
 
-### ENQ
+1. `INFO:network`
+2. `MODEL:<model>`
+3. `VERSION:<version>`
+4. `IPADR:<ip>`
+5. `MASK:<mask>`
+6. `GATEWAY:<gw>`
+7. `NAME:<name>`
 
-`ENQ:*` を受信した場合、以下を返します。
+実装上の注意:
 
-- `ACK:ENQ`
-- `INFO:<selector>`
-- `MAC:<virtualMac>`
-- `MODEL:<modelName>`
-- `MODELNAME:<modelName>`
-- `SERIAL:<serial>`
-- `SOFTVERSION:<softVersion>`
-- `IPADR:<advertisedIp>`
-- `MASK:<logicalMask>`
-- `GATEWAY:<logicalGateway>`
-- `WEBPORT:<webPort>`
-- `NAME:<friendlyName>`
+- `ACK:network` は返さない
+- `MAC` unit は返さない
+- `VERSION` は必須
+- `IPADR` は実IPv4（`127.0.0.1` は禁止）
 
-返信先は既定でユニキャスト（受信元 IP/Port）です。  
-`ipSetupResponderMode = Broadcast` でブロードキャスト返信に切り替えられます。
+## 5. SETMAC 応答（最重要）
 
-### SET
+`SETMAC` 受信時の応答は次のみ:
 
-`SETMAC` があり、`virtualMac` と一致する場合のみ受理します。
+- `ACK:<mac>`
 
-- 受理: `ACK:SET`
-- 不一致/不足: `NAK:<reason>`
+制約:
 
-`IPADR` / `MASK` / `GATEWAY` / `WEBPORT` / `NAME` を受信した場合は、
-非シリアライズの内部状態として保持され、応答生成に使われます。
+- 応答は 1 unit のみ
+- 追加 unit（`MAC:...` など）は付与しない
 
-## IPADR の決定
+## 6. アドレス広告方針
 
-`ipSetupAdvertisedAddressSource` で `IPADR` を決めます。
+`ViscaServerBehaviour` の `ipSetupAdvertisedAddressSource` で `IPADR` の元を選択:
 
-- `BindAddress`: `ViscaServerBehaviour.bindAddress` と同じ IP を返す
-- `CustomAddress`: `ipSetupCustomAdvertisedAddress` の IP を返す
+- `BindAddress`: `bindAddress` と同じIPを広告
+- `CustomAddress`: `ipSetupCustomAdvertisedAddress` を広告
 
-`BindAddress` で `0.0.0.0` のような未確定アドレスを指定した場合は起動時にエラーにします。  
-その場合は NIC の具体的な IP を `bindAddress` に設定するか、`CustomAddress` を使ってください。
+どちらのモードでもループバック（`127.0.0.1`）は拒否する。
 
-## デバウンス
+## 7. MAC 方針
 
-同一送信元から短時間に連続する ENQ は  
-`ipSetupEnqDebounceMilliseconds`（既定 250ms）で抑制できます。
+既定 MAC は Sony OUI 例を採用:
+
+- `88-C9-E8-00-00-03`
+
+## 8. デバッグ確認
+
+Wireshark で以下の順序を確認:
+
+1. `ENQ:network`
+2. `INFO:network ...`
+3. `SETMAC:...`
+4. `ACK:...`
+5. その後 `UDP 52381` の VISCA 通信

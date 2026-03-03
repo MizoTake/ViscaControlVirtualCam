@@ -18,7 +18,7 @@ namespace ViscaControlVirtualCam
     [Serializable]
     public sealed class VirtualDeviceIdentity
     {
-        public string virtualMac = "02:00:00:00:00:01";
+        public string virtualMac = "88-C9-E8-00-00-03";
         public string modelName = "BRC-X400";
         public string serial = "VC000001";
         public string softVersion = "1.00";
@@ -29,7 +29,7 @@ namespace ViscaControlVirtualCam
     [Serializable]
     public sealed class VirtualNetworkConfig
     {
-        public string logicalIp = "127.0.0.1";
+        public string logicalIp = "192.168.0.100";
         public string logicalMask = "255.255.255.0";
         public string logicalGateway = "0.0.0.0";
     }

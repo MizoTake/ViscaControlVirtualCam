@@ -28,7 +28,7 @@ namespace ViscaControlVirtualCam
         public IpSetupResponderMode ipSetupResponderMode = IpSetupResponderMode.Unicast;
         public IpSetupAdvertisedAddressSource ipSetupAdvertisedAddressSource = IpSetupAdvertisedAddressSource.BindAddress;
         [Tooltip("Used when Advertised Address Source = CustomAddress")]
-        public string ipSetupCustomAdvertisedAddress = "127.0.0.1";
+        public string ipSetupCustomAdvertisedAddress = "192.168.0.100";
         [Min(0)] public int ipSetupEnqDebounceMilliseconds = 250;
         public VirtualDeviceIdentity ipSetupIdentity = new VirtualDeviceIdentity();
 
@@ -292,7 +292,7 @@ namespace ViscaControlVirtualCam
             ipSetupIdentity ??= new VirtualDeviceIdentity();
 
             if (!IpSetupMessageProcessor.TryNormalizeMac(ipSetupIdentity.virtualMac, out var normalizedMac))
-                normalizedMac = "02:00:00:00:00:01";
+                normalizedMac = "88-C9-E8-00-00-03";
             ipSetupIdentity.virtualMac = normalizedMac;
 
             if (string.IsNullOrWhiteSpace(ipSetupIdentity.modelName))
@@ -327,6 +327,12 @@ namespace ViscaControlVirtualCam
                         $"[VISCA] IP Setup advertised address source is BindAddress but bindAddress '{bindAddress}' is not a concrete IPv4. Use a NIC IP or CustomAddress.");
                     return false;
                 }
+                if (IPAddress.IsLoopback(viscaBindAddress))
+                {
+                    Debug.LogError(
+                        $"[VISCA] IP Setup advertised address must be real IPv4. Loopback '{value}' is not allowed.");
+                    return false;
+                }
 
                 advertisedAddress = value;
                 return true;
@@ -336,6 +342,12 @@ namespace ViscaControlVirtualCam
             {
                 Debug.LogError(
                     $"[VISCA] Invalid ipSetupCustomAdvertisedAddress: '{ipSetupCustomAdvertisedAddress}'. Use IPv4 like 192.168.0.100.");
+                return false;
+            }
+            if (IPAddress.IsLoopback(IPAddress.Parse(ipSetupCustomAdvertisedAddress.Trim())))
+            {
+                Debug.LogError(
+                    $"[VISCA] IP Setup advertised address must be real IPv4. Loopback '{ipSetupCustomAdvertisedAddress}' is not allowed.");
                 return false;
             }
 

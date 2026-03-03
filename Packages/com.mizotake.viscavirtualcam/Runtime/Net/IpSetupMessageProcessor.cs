@@ -45,7 +45,7 @@ namespace ViscaControlVirtualCam
                 return HandleEnq(units, remoteEndpoint);
 
             if (isSet)
-                return HandleSet(units, remoteEndpoint);
+                return HandleSet(units);
 
             return new IpSetupProcessResult
             {
@@ -57,27 +57,22 @@ namespace ViscaControlVirtualCam
         private IpSetupProcessResult HandleEnq(List<IpSetupUnit> units, IPEndPoint remoteEndpoint)
         {
             var enqSelector = TryGetValue(units, "ENQ", out var value) && !string.IsNullOrWhiteSpace(value)
-                ? value
-                : "allinfo";
+                ? value.Trim()
+                : "network";
             var advertisedIp = ResolveAdvertisedIp(remoteEndpoint?.Address);
 
-            var response = new List<string>
-            {
-                "ACK:ENQ",
-                $"INFO:{enqSelector}"
-            };
-            AppendInfoUnits(response, advertisedIp);
+            var response = BuildNetworkInfoUnits(enqSelector, advertisedIp);
 
             return new IpSetupProcessResult
             {
                 ShouldRespond = true,
                 IsEnq = true,
                 Summary = $"IPSETUP ENQ handled ({enqSelector})",
-                ResponseUnits = response.ToArray()
+                ResponseUnits = response
             };
         }
 
-        private IpSetupProcessResult HandleSet(List<IpSetupUnit> units, IPEndPoint remoteEndpoint)
+        private IpSetupProcessResult HandleSet(List<IpSetupUnit> units)
         {
             if (!TryGetValue(units, "SETMAC", out var setMac))
                 return BuildNak("SETMAC_REQUIRED");
@@ -88,67 +83,30 @@ namespace ViscaControlVirtualCam
             if (!string.Equals(normalizedSetMac, _identity.virtualMac, StringComparison.OrdinalIgnoreCase))
                 return BuildNak("MAC_MISMATCH");
 
-            if (TryGetValue(units, "IPADR", out var ipadr))
-            {
-                if (!IsValidIpv4(ipadr))
-                    return BuildNak("INVALID_IPADR");
-                _network.logicalIp = ipadr;
-            }
-
-            if (TryGetValue(units, "MASK", out var mask))
-            {
-                if (!IsValidIpv4(mask))
-                    return BuildNak("INVALID_MASK");
-                _network.logicalMask = mask;
-            }
-
-            if (TryGetValue(units, "GATEWAY", out var gateway))
-            {
-                if (!IsValidIpv4(gateway))
-                    return BuildNak("INVALID_GATEWAY");
-                _network.logicalGateway = gateway;
-            }
-
-            if (TryGetValue(units, "WEBPORT", out var webPortRaw))
-            {
-                if (!int.TryParse(webPortRaw, out var webPort) || webPort <= 0 || webPort > 65535)
-                    return BuildNak("INVALID_WEBPORT");
-                _identity.webPort = webPort;
-            }
-
-            if (TryGetValue(units, "NAME", out var name) &&
-                !string.IsNullOrWhiteSpace(name))
-                _identity.friendlyName = name;
-
-            var advertisedIp = ResolveAdvertisedIp(remoteEndpoint?.Address);
-
-            var response = new List<string>
-            {
-                "ACK:SET"
-            };
-            AppendInfoUnits(response, advertisedIp);
-
             return new IpSetupProcessResult
             {
                 ShouldRespond = true,
                 IsSet = true,
-                Summary = "IPSETUP SET accepted",
-                ResponseUnits = response.ToArray()
+                Summary = "IPSETUP SETMAC accepted",
+                ResponseUnits = new[] { $"ACK:{normalizedSetMac}" }
             };
         }
 
-        private void AppendInfoUnits(List<string> response, string advertisedIp)
+        private string[] BuildNetworkInfoUnits(string selector, string advertisedIp)
         {
-            response.Add($"MAC:{_identity.virtualMac}");
-            response.Add($"MODEL:{_identity.modelName}");
-            response.Add($"MODELNAME:{_identity.modelName}");
-            response.Add($"SERIAL:{_identity.serial}");
-            response.Add($"SOFTVERSION:{_identity.softVersion}");
-            response.Add($"IPADR:{advertisedIp}");
-            response.Add($"MASK:{_network.logicalMask}");
-            response.Add($"GATEWAY:{_network.logicalGateway}");
-            response.Add($"WEBPORT:{_identity.webPort}");
-            response.Add($"NAME:{_identity.friendlyName}");
+            if (!string.Equals(selector, "network", StringComparison.OrdinalIgnoreCase))
+                selector = "network";
+
+            return new[]
+            {
+                $"INFO:{selector}",
+                $"MODEL:{_identity.modelName}",
+                $"VERSION:{_identity.softVersion}",
+                $"IPADR:{advertisedIp}",
+                $"MASK:{_network.logicalMask}",
+                $"GATEWAY:{_network.logicalGateway}",
+                $"NAME:{_identity.friendlyName}"
+            };
         }
 
         private IpSetupProcessResult BuildNak(string reason)
@@ -165,15 +123,22 @@ namespace ViscaControlVirtualCam
         private string ResolveAdvertisedIp(IPAddress remoteAddress)
         {
             var resolved = _advertisedIpResolver?.Invoke(remoteAddress);
-            if (IsValidIpv4(resolved))
+            if (IsValidIpv4(resolved) && !IsLoopbackIpv4(resolved))
                 return resolved;
 
-            return IsValidIpv4(_network.logicalIp) ? _network.logicalIp : "127.0.0.1";
+            return IsValidIpv4(_network.logicalIp) && !IsLoopbackIpv4(_network.logicalIp)
+                ? _network.logicalIp
+                : string.Empty;
         }
 
         private static bool IsValidIpv4(string value)
         {
             return IPAddress.TryParse(value, out var address) && address.AddressFamily == AddressFamily.InterNetwork;
+        }
+
+        private static bool IsLoopbackIpv4(string value)
+        {
+            return IPAddress.TryParse(value, out var address) && IPAddress.IsLoopback(address);
         }
 
         public static bool TryNormalizeMac(string input, out string normalized)
@@ -194,11 +159,11 @@ namespace ViscaControlVirtualCam
                 return false;
 
             normalized = string.Concat(
-                hex[0], hex[1], ":",
-                hex[2], hex[3], ":",
-                hex[4], hex[5], ":",
-                hex[6], hex[7], ":",
-                hex[8], hex[9], ":",
+                hex[0], hex[1], "-",
+                hex[2], hex[3], "-",
+                hex[4], hex[5], "-",
+                hex[6], hex[7], "-",
+                hex[8], hex[9], "-",
                 hex[10], hex[11]);
             return true;
         }

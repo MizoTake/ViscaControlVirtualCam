@@ -40,20 +40,18 @@ public class IpSetupProtocolTests
     }
 
     [Test]
-    public void MessageProcessor_Enq_ReturnsInfoUnits()
+    public void MessageProcessor_EnqNetwork_ReturnsFixedUnitsInOrder()
     {
         var identity = new VirtualDeviceIdentity
         {
-            virtualMac = "02:11:22:33:44:55",
+            virtualMac = "88-C9-E8-00-00-03",
             modelName = "BRC-X400",
-            serial = "VC123456",
             softVersion = "1.23",
-            webPort = 80,
             friendlyName = "VCam"
         };
         var network = new VirtualNetworkConfig
         {
-            logicalIp = "10.0.0.20",
+            logicalIp = "192.168.1.50",
             logicalMask = "255.255.255.0",
             logicalGateway = "10.0.0.1"
         };
@@ -63,61 +61,49 @@ public class IpSetupProtocolTests
             network,
             _ => "192.168.1.50");
 
-        var result = processor.Process(new IPEndPoint(IPAddress.Parse("192.168.1.10"), 52380), new[] { "ENQ:allinfo" });
+        var result = processor.Process(new IPEndPoint(IPAddress.Parse("192.168.1.10"), 52380), new[] { "ENQ:network" });
 
         Assert.IsTrue(result.ShouldRespond);
         Assert.IsTrue(result.IsEnq);
-        CollectionAssert.Contains(result.ResponseUnits, "ACK:ENQ");
-        CollectionAssert.Contains(result.ResponseUnits, "MAC:02:11:22:33:44:55");
-        CollectionAssert.Contains(result.ResponseUnits, "IPADR:192.168.1.50");
+        CollectionAssert.AreEqual(new[]
+        {
+            "INFO:network",
+            "MODEL:BRC-X400",
+            "VERSION:1.23",
+            "IPADR:192.168.1.50",
+            "MASK:255.255.255.0",
+            "GATEWAY:10.0.0.1",
+            "NAME:VCam"
+        }, result.ResponseUnits);
     }
 
     [Test]
-    public void MessageProcessor_Set_WithMatchingMac_UpdatesNetworkAndIdentity()
+    public void MessageProcessor_SetMac_WithMatchingMac_ReturnsSingleAckUnit()
     {
         var identity = new VirtualDeviceIdentity
         {
-            virtualMac = "02:11:22:33:44:55",
-            friendlyName = "Before",
-            webPort = 80
+            virtualMac = "88-C9-E8-00-00-03"
         };
-        var network = new VirtualNetworkConfig
-        {
-            logicalIp = "10.0.0.20",
-            logicalMask = "255.255.255.0",
-            logicalGateway = "10.0.0.1"
-        };
+        var network = new VirtualNetworkConfig();
 
         var processor = new IpSetupMessageProcessor(
             identity,
             network,
             _ => "192.168.1.50");
 
-        var units = new[]
-        {
-            "SET:network",
-            "SETMAC:02:11:22:33:44:55",
-            "IPADR:10.0.0.99",
-            "MASK:255.255.255.0",
-            "GATEWAY:10.0.0.1",
-            "WEBPORT:8080",
-            "NAME:After"
-        };
+        var units = new[] { "SETMAC:88-C9-E8-00-00-03" };
 
         var result = processor.Process(new IPEndPoint(IPAddress.Parse("192.168.1.10"), 52380), units);
 
         Assert.IsTrue(result.ShouldRespond);
         Assert.IsTrue(result.IsSet);
-        CollectionAssert.Contains(result.ResponseUnits, "ACK:SET");
-        Assert.AreEqual("10.0.0.99", network.logicalIp);
-        Assert.AreEqual("After", identity.friendlyName);
-        Assert.AreEqual(8080, identity.webPort);
+        CollectionAssert.AreEqual(new[] { "ACK:88-C9-E8-00-00-03" }, result.ResponseUnits);
     }
 
     [Test]
     public void MessageProcessor_Set_WithMacMismatch_ReturnsNak()
     {
-        var identity = new VirtualDeviceIdentity { virtualMac = "02:11:22:33:44:55" };
+        var identity = new VirtualDeviceIdentity { virtualMac = "88-C9-E8-00-00-03" };
         var network = new VirtualNetworkConfig();
         var processor = new IpSetupMessageProcessor(
             identity,
@@ -126,7 +112,7 @@ public class IpSetupProtocolTests
 
         var result = processor.Process(
             new IPEndPoint(IPAddress.Parse("192.168.1.10"), 52380),
-            new[] { "SET:network", "SETMAC:02:AA:BB:CC:DD:EE", "IPADR:10.0.0.99" });
+            new[] { "SETMAC:88-C9-E8-00-00-04" });
 
         Assert.IsTrue(result.ShouldRespond);
         Assert.IsTrue(result.IsSet);
@@ -136,7 +122,7 @@ public class IpSetupProtocolTests
     [Test]
     public void MessageProcessor_UsesResolverAddressForResponse()
     {
-        var identity = new VirtualDeviceIdentity { virtualMac = "02:11:22:33:44:55" };
+        var identity = new VirtualDeviceIdentity { virtualMac = "88-C9-E8-00-00-03" };
         var network = new VirtualNetworkConfig { logicalIp = "10.10.10.10" };
         var processor = new IpSetupMessageProcessor(
             identity,
@@ -148,13 +134,15 @@ public class IpSetupProtocolTests
             new[] { "ENQ:network" });
 
         Assert.IsTrue(result.ShouldRespond);
+        Assert.AreEqual("INFO:network", result.ResponseUnits[0]);
         CollectionAssert.Contains(result.ResponseUnits, "IPADR:192.168.1.50");
+        Assert.IsFalse(result.ResponseUnits.Any(x => x.StartsWith("MAC:", System.StringComparison.Ordinal)));
     }
 
     [Test]
     public void FrameCodec_BuildAndParse_RoundTrip()
     {
-        var units = new List<string> { "ACK:SET", "MAC:02:11:22:33:44:55", "IPADR:10.0.0.10" };
+        var units = new List<string> { "ACK:88-C9-E8-00-00-03" };
         var frame = IpSetupFrameCodec.Build(units);
         var parsed = IpSetupFrameCodec.TryParse(frame, out var roundTrip, out var error);
 

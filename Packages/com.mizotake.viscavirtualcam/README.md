@@ -121,6 +121,9 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 - 設定値は Unity Inspector の `ViscaServerBehaviour` 上で管理
 - 応答 `IPADR` は `bindAddress` と同一にするか、カスタムIPを指定するかを選択
 - 応答モードは `Unicast` / `Broadcast` を選択可能
+- `ENQ:network` には実機準拠の固定順 `INFO:network, MODEL, VERSION, IPADR, MASK, GATEWAY, NAME` で応答
+- `SETMAC` には `ACK:<mac>` の 1 unit のみで応答（追加 unit なし）
+- 既定 MAC は Sony OUI 例 `88-C9-E8-00-00-03`
 
 ## 拡張
 
