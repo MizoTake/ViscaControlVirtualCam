@@ -175,6 +175,24 @@ public class ViscaResponseTests
     }
 
     [Test]
+    public void CameraPower_InvalidState_ReturnsSyntaxError()
+    {
+        var model = new PtzModel();
+        var handler = new PtzViscaHandler(model, a => a(), ViscaReplyMode.AckAndCompletion, _ => { });
+        byte[] sent = null;
+
+        var context = ViscaCommandContext.CameraPower(
+            new byte[] { 0x82, 0x01, 0x04, 0x00, 0x7F, 0xFF },
+            b => sent = b,
+            0x7F);
+
+        var handled = handler.Handle(in context);
+
+        Assert.IsTrue(handled);
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x62, ViscaProtocol.ErrorSyntax, 0xFF }, sent);
+    }
+
+    [Test]
     public void VersionInquiry_ReturnsVersionPayload()
     {
         var model = new PtzModel();
@@ -192,6 +210,28 @@ public class ViscaResponseTests
         Assert.AreEqual(0x55, sent[1]);
         Assert.AreEqual(ViscaProtocol.VersionMaxSocketCount, sent[8]);
         Assert.AreEqual(0xFF, sent[9]);
+    }
+
+    [Test]
+    public void VersionInquiry_ReturnsExpectedFixedVersionFields()
+    {
+        var model = new PtzModel();
+        var handler = new PtzViscaHandler(model, a => a(), ViscaReplyMode.AckAndCompletion, _ => { });
+        var registry = new ViscaCommandRegistry();
+        byte[] sent = null;
+
+        registry.TryExecute(new byte[] { 0x85, 0x09, 0x00, 0x02, 0xFF }, handler, b => sent = b);
+
+        Assert.IsNotNull(sent);
+        CollectionAssert.AreEqual(new byte[]
+        {
+            0x90, 0x55,
+            (byte)((ViscaProtocol.VersionVendorId >> 8) & 0xFF), (byte)(ViscaProtocol.VersionVendorId & 0xFF),
+            (byte)((ViscaProtocol.VersionModelId >> 8) & 0xFF), (byte)(ViscaProtocol.VersionModelId & 0xFF),
+            (byte)((ViscaProtocol.VersionRomVersion >> 8) & 0xFF), (byte)(ViscaProtocol.VersionRomVersion & 0xFF),
+            ViscaProtocol.VersionMaxSocketCount,
+            0xFF
+        }, sent);
     }
 
     private sealed class CapturingHandler : IViscaCommandHandler

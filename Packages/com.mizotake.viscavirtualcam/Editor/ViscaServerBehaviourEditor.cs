@@ -13,12 +13,14 @@ namespace ViscaControlVirtualCam.Editor
         private SerializedProperty ipSetupCustomAdvertisedAddress;
         private SerializedProperty ipSetupEnqDebounceMilliseconds;
         private SerializedProperty ipSetupIdentity;
+        private SerializedProperty ipSetupNetwork;
         private SerializedProperty ipSetupPort;
         private SerializedProperty ipSetupResponderMode;
         private SerializedProperty logLevel;
         private SerializedProperty logReceivedCommands;
         private SerializedProperty maxClients;
         private SerializedProperty operationMode;
+        private SerializedProperty pendingQueueLimit;
         private SerializedProperty ptzController;
         private SerializedProperty realCameraIp;
         private SerializedProperty realCameraPort;
@@ -37,6 +39,7 @@ namespace ViscaControlVirtualCam.Editor
             tcpPort = serializedObject.FindProperty("tcpPort");
             maxClients = serializedObject.FindProperty("maxClients");
             replyMode = serializedObject.FindProperty("replyMode");
+            pendingQueueLimit = serializedObject.FindProperty("pendingQueueLimit");
             enableIpSetupResponder = serializedObject.FindProperty("enableIpSetupResponder");
             ipSetupPort = serializedObject.FindProperty("ipSetupPort");
             ipSetupResponderMode = serializedObject.FindProperty("ipSetupResponderMode");
@@ -44,6 +47,7 @@ namespace ViscaControlVirtualCam.Editor
             ipSetupCustomAdvertisedAddress = serializedObject.FindProperty("ipSetupCustomAdvertisedAddress");
             ipSetupEnqDebounceMilliseconds = serializedObject.FindProperty("ipSetupEnqDebounceMilliseconds");
             ipSetupIdentity = serializedObject.FindProperty("ipSetupIdentity");
+            ipSetupNetwork = serializedObject.FindProperty("ipSetupNetwork");
             operationMode = serializedObject.FindProperty("operationMode");
             realCameraIp = serializedObject.FindProperty("realCameraIp");
             realCameraPort = serializedObject.FindProperty("realCameraPort");
@@ -66,6 +70,7 @@ namespace ViscaControlVirtualCam.Editor
             EditorGUILayout.PropertyField(tcpPort);
             EditorGUILayout.PropertyField(maxClients);
             EditorGUILayout.PropertyField(replyMode);
+            EditorGUILayout.PropertyField(pendingQueueLimit);
             EditorGUILayout.PropertyField(operationMode);
 
             if ((ViscaOperationMode)operationMode.enumValueIndex != ViscaOperationMode.VirtualOnly)
@@ -87,6 +92,7 @@ namespace ViscaControlVirtualCam.Editor
                     EditorGUILayout.PropertyField(ipSetupCustomAdvertisedAddress);
                 EditorGUILayout.PropertyField(ipSetupEnqDebounceMilliseconds);
                 EditorGUILayout.PropertyField(ipSetupIdentity, true);
+                EditorGUILayout.PropertyField(ipSetupNetwork, true);
                 EditorGUI.indentLevel--;
             }
 

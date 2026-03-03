@@ -31,6 +31,7 @@ namespace ViscaControlVirtualCam
         public string ipSetupCustomAdvertisedAddress = "192.168.0.100";
         [Min(0)] public int ipSetupEnqDebounceMilliseconds = 250;
         public VirtualDeviceIdentity ipSetupIdentity = new VirtualDeviceIdentity();
+        public VirtualNetworkConfig ipSetupNetwork = new VirtualNetworkConfig();
 
         [Header("Operation Mode")] public ViscaOperationMode operationMode = ViscaOperationMode.VirtualOnly;
 
@@ -51,7 +52,6 @@ namespace ViscaControlVirtualCam
         [Header("Targets")] public PtzControllerBehaviour ptzController;
 
         private readonly ConcurrentQueue<Action> _mainThreadActions = new();
-        private readonly VirtualNetworkConfig _ipSetupNetwork = new();
         private ViscaServerCore _core;
         private ViscaForwarder _forwarder;
         private IpSetupResponder _ipSetupResponder;
@@ -251,7 +251,7 @@ namespace ViscaControlVirtualCam
 
                 var processor = new IpSetupMessageProcessor(
                     ipSetupIdentity,
-                    _ipSetupNetwork,
+                    ipSetupNetwork,
                     _ => advertisedAddress);
 
                 var options = new IpSetupResponderOptions
@@ -290,6 +290,7 @@ namespace ViscaControlVirtualCam
         private void EnsureIpSetupDefaults(string advertisedAddress)
         {
             ipSetupIdentity ??= new VirtualDeviceIdentity();
+            ipSetupNetwork ??= new VirtualNetworkConfig();
 
             if (!IpSetupMessageProcessor.TryNormalizeMac(ipSetupIdentity.virtualMac, out var normalizedMac))
                 normalizedMac = "88-C9-E8-00-00-03";
@@ -306,12 +307,12 @@ namespace ViscaControlVirtualCam
             if (string.IsNullOrWhiteSpace(ipSetupIdentity.friendlyName))
                 ipSetupIdentity.friendlyName = "CAM1";
 
-            if (!TryParseIpv4(_ipSetupNetwork.logicalIp, out _))
-                _ipSetupNetwork.logicalIp = advertisedAddress;
-            if (!TryParseIpv4(_ipSetupNetwork.logicalMask, out _))
-                _ipSetupNetwork.logicalMask = "255.255.255.0";
-            if (!TryParseIpv4(_ipSetupNetwork.logicalGateway, out _))
-                _ipSetupNetwork.logicalGateway = "0.0.0.0";
+            if (!TryParseIpv4(ipSetupNetwork.logicalIp, out _))
+                ipSetupNetwork.logicalIp = advertisedAddress;
+            if (!TryParseIpv4(ipSetupNetwork.logicalMask, out _))
+                ipSetupNetwork.logicalMask = "255.255.255.0";
+            if (!TryParseIpv4(ipSetupNetwork.logicalGateway, out _))
+                ipSetupNetwork.logicalGateway = "0.0.0.0";
         }
 
         private bool TryResolveIpSetupAdvertisedAddress(IPAddress viscaBindAddress, out string advertisedAddress)
@@ -321,7 +322,7 @@ namespace ViscaControlVirtualCam
             if (ipSetupAdvertisedAddressSource == IpSetupAdvertisedAddressSource.BindAddress)
             {
                 var value = viscaBindAddress?.ToString();
-                if (!TryParseIpv4(value, out _))
+                if (!TryParseIpv4(value, out _) || !IsConcreteIpv4(viscaBindAddress))
                 {
                     Debug.LogError(
                         $"[VISCA] IP Setup advertised address source is BindAddress but bindAddress '{bindAddress}' is not a concrete IPv4. Use a NIC IP or CustomAddress.");
@@ -352,6 +353,17 @@ namespace ViscaControlVirtualCam
             }
 
             advertisedAddress = ipSetupCustomAdvertisedAddress.Trim();
+            return true;
+        }
+
+        private static bool IsConcreteIpv4(IPAddress address)
+        {
+            if (address == null)
+                return false;
+            if (address.AddressFamily != System.Net.Sockets.AddressFamily.InterNetwork)
+                return false;
+            if (IPAddress.Any.Equals(address) || IPAddress.None.Equals(address) || IPAddress.Broadcast.Equals(address))
+                return false;
             return true;
         }
 

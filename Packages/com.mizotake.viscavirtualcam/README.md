@@ -120,6 +120,7 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 - RM-IP500 の AUTO IP SETUP / Auto Assign 向け探索応答に対応
 - 設定値は Unity Inspector の `ViscaServerBehaviour` 上で管理
 - 応答 `IPADR` は `bindAddress` と同一にするか、カスタムIPを指定するかを選択
+- `ipSetupNetwork`（`logicalIp` / `logicalMask` / `logicalGateway`）を Inspector から調整可能
 - 応答モードは `Unicast` / `Broadcast` を選択可能
 - `ENQ:network` には実機準拠の固定順 `MAC, INFO:network, MODEL, SOFTVERSION, IPADR, MASK, GATEWAY, NAME, WRITE:on` で応答
 - `SETMAC` には `ACK:<mac>` の 1 unit のみで応答（追加 unit なし）
