@@ -19,11 +19,11 @@ namespace ViscaControlVirtualCam
     public sealed class VirtualDeviceIdentity
     {
         public string virtualMac = "88-C9-E8-00-00-03";
-        public string modelName = "BRC-X400";
+        public string modelName = "IPCA";
         public string serial = "VC000001";
-        public string softVersion = "1.00";
+        public string softVersion = "2.10";
         public int webPort = 80;
-        public string friendlyName = "Visca Virtual Cam";
+        public string friendlyName = "CAM1";
     }
 
     [Serializable]

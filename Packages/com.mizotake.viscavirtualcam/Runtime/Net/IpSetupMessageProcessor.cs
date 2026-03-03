@@ -99,13 +99,15 @@ namespace ViscaControlVirtualCam
 
             return new[]
             {
+                $"MAC:{_identity.virtualMac}",
                 $"INFO:{selector}",
                 $"MODEL:{_identity.modelName}",
-                $"VERSION:{_identity.softVersion}",
+                $"SOFTVERSION:{_identity.softVersion}",
                 $"IPADR:{advertisedIp}",
                 $"MASK:{_network.logicalMask}",
                 $"GATEWAY:{_network.logicalGateway}",
-                $"NAME:{_identity.friendlyName}"
+                $"NAME:{_identity.friendlyName}",
+                "WRITE:on"
             };
         }
 

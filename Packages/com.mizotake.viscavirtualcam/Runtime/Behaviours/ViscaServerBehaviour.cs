@@ -296,15 +296,15 @@ namespace ViscaControlVirtualCam
             ipSetupIdentity.virtualMac = normalizedMac;
 
             if (string.IsNullOrWhiteSpace(ipSetupIdentity.modelName))
-                ipSetupIdentity.modelName = "BRC-X400";
+                ipSetupIdentity.modelName = "IPCA";
             if (string.IsNullOrWhiteSpace(ipSetupIdentity.serial))
                 ipSetupIdentity.serial = "VC000001";
             if (string.IsNullOrWhiteSpace(ipSetupIdentity.softVersion))
-                ipSetupIdentity.softVersion = "1.00";
+                ipSetupIdentity.softVersion = "2.10";
             if (ipSetupIdentity.webPort <= 0 || ipSetupIdentity.webPort > 65535)
                 ipSetupIdentity.webPort = 80;
             if (string.IsNullOrWhiteSpace(ipSetupIdentity.friendlyName))
-                ipSetupIdentity.friendlyName = "Visca Virtual Cam";
+                ipSetupIdentity.friendlyName = "CAM1";
 
             if (!TryParseIpv4(_ipSetupNetwork.logicalIp, out _))
                 _ipSetupNetwork.logicalIp = advertisedAddress;

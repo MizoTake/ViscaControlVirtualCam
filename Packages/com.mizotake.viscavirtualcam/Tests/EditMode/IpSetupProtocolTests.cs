@@ -45,9 +45,9 @@ public class IpSetupProtocolTests
         var identity = new VirtualDeviceIdentity
         {
             virtualMac = "88-C9-E8-00-00-03",
-            modelName = "BRC-X400",
-            softVersion = "1.23",
-            friendlyName = "VCam"
+            modelName = "IPCA",
+            softVersion = "2.10",
+            friendlyName = "CAM1"
         };
         var network = new VirtualNetworkConfig
         {
@@ -67,13 +67,15 @@ public class IpSetupProtocolTests
         Assert.IsTrue(result.IsEnq);
         CollectionAssert.AreEqual(new[]
         {
+            "MAC:88-C9-E8-00-00-03",
             "INFO:network",
-            "MODEL:BRC-X400",
-            "VERSION:1.23",
+            "MODEL:IPCA",
+            "SOFTVERSION:2.10",
             "IPADR:192.168.1.50",
             "MASK:255.255.255.0",
             "GATEWAY:10.0.0.1",
-            "NAME:VCam"
+            "NAME:CAM1",
+            "WRITE:on"
         }, result.ResponseUnits);
     }
 
@@ -134,9 +136,10 @@ public class IpSetupProtocolTests
             new[] { "ENQ:network" });
 
         Assert.IsTrue(result.ShouldRespond);
-        Assert.AreEqual("INFO:network", result.ResponseUnits[0]);
+        Assert.AreEqual("MAC:88-C9-E8-00-00-03", result.ResponseUnits[0]);
+        Assert.AreEqual("INFO:network", result.ResponseUnits[1]);
         CollectionAssert.Contains(result.ResponseUnits, "IPADR:192.168.1.50");
-        Assert.IsFalse(result.ResponseUnits.Any(x => x.StartsWith("MAC:", System.StringComparison.Ordinal)));
+        CollectionAssert.Contains(result.ResponseUnits, "WRITE:on");
     }
 
     [Test]
