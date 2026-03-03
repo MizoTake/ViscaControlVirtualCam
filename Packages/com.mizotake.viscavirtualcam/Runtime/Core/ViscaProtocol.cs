@@ -76,6 +76,16 @@ namespace ViscaControlVirtualCam
         public const byte FocusModeAuto = 0x02;
         public const byte FocusModeManual = 0x03;
 
+        // Camera power
+        public const byte PowerOn = 0x02;
+        public const byte PowerOff = 0x03;
+
+        // Version inquiry response defaults (GG HH JJ KK)
+        public const ushort VersionVendorId = 0x0001;
+        public const ushort VersionModelId = 0x0001;
+        public const ushort VersionRomVersion = 0x0100;
+        public const byte VersionMaxSocketCount = 0x02;
+
         // Memory preset limits
         public const byte MemoryPresetMin = 0x00;
         public const byte MemoryPresetMax = 0xFF;

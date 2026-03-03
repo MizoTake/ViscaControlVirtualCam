@@ -34,7 +34,13 @@ namespace ViscaControlVirtualCam
         MemorySet,
         MemoryReset,
 
+        // Interface/Camera common commands
+        InterfaceClear,
+        CameraPower,
+
         // Inquiry commands
+        CameraPowerInquiry,
+        VersionInquiry,
         PanTiltPositionInquiry,
         ZoomPositionInquiry,
         FocusPositionInquiry,
@@ -94,6 +100,9 @@ namespace ViscaControlVirtualCam
         // Memory parameters
         public readonly byte MemoryNumber;
 
+        // Camera common parameters
+        public readonly byte PowerState;
+
         private ViscaCommandContext(
             ViscaCommandType commandType,
             byte[] frame,
@@ -112,7 +121,8 @@ namespace ViscaControlVirtualCam
             byte focusMode = 0,
             byte irisDirection = 0,
             ushort irisPosition = 0,
-            byte memoryNumber = 0)
+            byte memoryNumber = 0,
+            byte powerState = 0)
         {
             CommandType = commandType;
             Frame = frame;
@@ -132,6 +142,7 @@ namespace ViscaControlVirtualCam
             IrisDirection = irisDirection;
             IrisPosition = irisPosition;
             MemoryNumber = memoryNumber;
+            PowerState = powerState;
         }
 
         // Factory methods for each command type
@@ -250,6 +261,29 @@ namespace ViscaControlVirtualCam
                 memoryNumber: memNum);
         }
 
+        public static ViscaCommandContext InterfaceClear(byte[] frame, Action<byte[]> responder)
+        {
+            return new ViscaCommandContext(ViscaCommandType.InterfaceClear, frame, responder, GetSocketId(frame));
+        }
+
+        public static ViscaCommandContext CameraPower(byte[] frame, Action<byte[]> responder, byte powerState)
+        {
+            return new ViscaCommandContext(
+                ViscaCommandType.CameraPower, frame, responder,
+                GetSocketId(frame),
+                powerState: powerState);
+        }
+
+        public static ViscaCommandContext CameraPowerInquiry(byte[] frame, Action<byte[]> responder)
+        {
+            return new ViscaCommandContext(ViscaCommandType.CameraPowerInquiry, frame, responder, GetSocketId(frame));
+        }
+
+        public static ViscaCommandContext VersionInquiry(byte[] frame, Action<byte[]> responder)
+        {
+            return new ViscaCommandContext(ViscaCommandType.VersionInquiry, frame, responder, GetSocketId(frame));
+        }
+
         public static ViscaCommandContext PanTiltPositionInquiry(byte[] frame, Action<byte[]> responder)
         {
             return new ViscaCommandContext(ViscaCommandType.PanTiltPositionInquiry, frame, responder,
@@ -310,6 +344,11 @@ namespace ViscaControlVirtualCam
                     $"MemorySet: Preset={MemoryNumber}",
                 ViscaCommandType.MemoryReset =>
                     $"MemoryReset: Preset={MemoryNumber}",
+                ViscaCommandType.InterfaceClear => "InterfaceClear",
+                ViscaCommandType.CameraPower =>
+                    $"CameraPower: {(PowerState == ViscaProtocol.PowerOn ? "On" : PowerState == ViscaProtocol.PowerOff ? "Off" : $"0x{PowerState:X2}")}",
+                ViscaCommandType.CameraPowerInquiry => "CameraPowerInquiry",
+                ViscaCommandType.VersionInquiry => "VersionInquiry",
                 ViscaCommandType.PanTiltPositionInquiry => "PanTiltPositionInquiry",
                 ViscaCommandType.ZoomPositionInquiry => "ZoomPositionInquiry",
                 ViscaCommandType.FocusPositionInquiry => "FocusPositionInquiry",

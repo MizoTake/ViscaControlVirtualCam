@@ -265,6 +265,50 @@ public class ViscaServerCoreTests
         Assert.AreEqual(0x01, ctx.SocketId);
     }
 
+    [Test]
+    public void ProcessFrame_InterfaceClear_ParsesCorrectly()
+    {
+        var receivedContexts = new List<ViscaCommandContext>();
+        var handler = new RecordingHandler(receivedContexts);
+        var server = new ViscaServerCore(handler, new ViscaServerOptions
+        {
+            VerboseLog = false,
+            LogReceivedCommands = false
+        });
+        var sent = new List<byte[]>();
+
+        byte[] frame = { 0x85, 0x01, 0x00, 0x01, 0xFF };
+        InvokeProcessFrame(server, frame, sent);
+        server.Dispose();
+
+        Assert.AreEqual(1, receivedContexts.Count, "Should receive one command");
+        var ctx = receivedContexts[0];
+        Assert.AreEqual(ViscaCommandType.InterfaceClear, ctx.CommandType);
+        Assert.AreEqual(0x05, ctx.SocketId);
+    }
+
+    [Test]
+    public void ProcessFrame_CameraPowerInquiry_ParsesCorrectly()
+    {
+        var receivedContexts = new List<ViscaCommandContext>();
+        var handler = new RecordingHandler(receivedContexts);
+        var server = new ViscaServerCore(handler, new ViscaServerOptions
+        {
+            VerboseLog = false,
+            LogReceivedCommands = false
+        });
+        var sent = new List<byte[]>();
+
+        byte[] frame = { 0x82, 0x09, 0x04, 0x00, 0xFF };
+        InvokeProcessFrame(server, frame, sent);
+        server.Dispose();
+
+        Assert.AreEqual(1, receivedContexts.Count, "Should receive one command");
+        var ctx = receivedContexts[0];
+        Assert.AreEqual(ViscaCommandType.CameraPowerInquiry, ctx.CommandType);
+        Assert.AreEqual(0x02, ctx.SocketId);
+    }
+
     #endregion
 
     #region Error Handling Tests

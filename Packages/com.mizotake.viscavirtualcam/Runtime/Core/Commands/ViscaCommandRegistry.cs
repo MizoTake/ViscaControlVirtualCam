@@ -42,6 +42,14 @@ namespace ViscaControlVirtualCam
                     return null;
                 });
 
+            // Interface Clear: 8X 01 00 01 FF
+            Register(0x01, 0x00, 0x01, ViscaCommandType.InterfaceClear, "InterfaceClear",
+                (frame, responder) =>
+                {
+                    if (frame.Length != 5) return null;
+                    return ViscaCommandContext.InterfaceClear(frame, responder);
+                });
+
             // Pan/Tilt Drive: 8X 01 06 01 VV WW PP TT FF
             Register(0x01, 0x06, 0x01, ViscaCommandType.PanTiltDrive, "PanTiltDrive",
                 (frame, responder) =>
@@ -132,6 +140,15 @@ namespace ViscaControlVirtualCam
             Register(0x01, 0x04, 0x18, ViscaCommandType.FocusOnePush, "FocusOnePush",
                 (frame, responder) => ViscaCommandContext.FocusOnePush(frame, responder));
 
+            // Camera Power: 8X 01 04 00 02/03 FF
+            Register(0x01, 0x04, 0x00, ViscaCommandType.CameraPower, "CameraPower",
+                (frame, responder) =>
+                {
+                    if (frame.Length != 6) return null;
+                    if (frame[4] != ViscaProtocol.PowerOn && frame[4] != ViscaProtocol.PowerOff) return null;
+                    return ViscaCommandContext.CameraPower(frame, responder, frame[4]);
+                });
+
             // Iris Variable: 8X 01 04 0B 00/02/03 FF
             Register(0x01, 0x04, 0x0B, ViscaCommandType.IrisVariable, "IrisVariable",
                 (frame, responder) =>
@@ -194,6 +211,22 @@ namespace ViscaControlVirtualCam
             // Focus Mode Inquiry: 8X 09 04 38 FF
             Register(0x09, 0x04, 0x38, ViscaCommandType.FocusModeInquiry, "FocusModeInquiry",
                 (frame, responder) => ViscaCommandContext.FocusModeInquiry(frame, responder));
+
+            // Camera Power Inquiry: 8X 09 04 00 FF
+            Register(0x09, 0x04, 0x00, ViscaCommandType.CameraPowerInquiry, "CameraPowerInquiry",
+                (frame, responder) =>
+                {
+                    if (frame.Length != 5) return null;
+                    return ViscaCommandContext.CameraPowerInquiry(frame, responder);
+                });
+
+            // Version Inquiry: 8X 09 00 02 FF
+            Register(0x09, 0x00, 0x02, ViscaCommandType.VersionInquiry, "VersionInquiry",
+                (frame, responder) =>
+                {
+                    if (frame.Length != 5) return null;
+                    return ViscaCommandContext.VersionInquiry(frame, responder);
+                });
         }
 
         /// <summary>

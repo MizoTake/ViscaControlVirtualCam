@@ -117,6 +117,25 @@ namespace ViscaControlVirtualCam
             });
         }
 
+        /// <summary>
+        ///     Send version inquiry response.
+        ///     Format: 90 50 GG GG HH HH JJ JJ KK FF
+        /// </summary>
+        public static void SendVersionInquiryResponse(Action<byte[]> responder,
+            ushort vendorId, ushort modelId, ushort romVersion, byte maxSocket, byte socketId)
+        {
+            var completion = (byte)(ViscaProtocol.ResponseCompletion | (socketId & 0x0F));
+            responder(new byte[]
+            {
+                0x90, completion,
+                (byte)((vendorId >> 8) & 0xFF), (byte)(vendorId & 0xFF),
+                (byte)((modelId >> 8) & 0xFF), (byte)(modelId & 0xFF),
+                (byte)((romVersion >> 8) & 0xFF), (byte)(romVersion & 0xFF),
+                maxSocket,
+                ViscaProtocol.FrameTerminator
+            });
+        }
+
         private static byte[] BuildSimpleResponse(byte baseCode, byte socketId)
         {
             return new byte[]

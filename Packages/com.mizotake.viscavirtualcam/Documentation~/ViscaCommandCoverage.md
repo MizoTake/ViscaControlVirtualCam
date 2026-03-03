@@ -42,11 +42,15 @@
 ### Control Commands
 | コマンド | バイトシーケンス | 実装状況 |
 |---------|----------------|---------|
+| Interface Clear | `8X 01 00 01 FF` | ✓ 実装済み (RM-IP500互換) |
 | Command Cancel | `8X 2Z FF` | ✓ 実装済み |
+| Camera Power (On/Off) | `8X 01 04 00 02/03 FF` | ✓ 実装済み (RM-IP500互換) |
 
 ### Inquiry Commands (応答系)
 | コマンド | バイトシーケンス | 実装状況 |
 |---------|----------------|---------|
+| Camera Power Inquiry | `8X 09 04 00 FF` | ✓ 実装済み (RM-IP500互換) |
+| Version Inquiry | `8X 09 00 02 FF` | ✓ 実装済み (RM-IP500互換) |
 | Pan/Tilt Position Inquiry | `8X 09 06 12 FF` | ✓ 実装済み |
 | Zoom Position Inquiry | `8X 09 04 47 FF` | ✓ 実装済み |
 | Focus Position Inquiry | `8X 09 04 48 FF` | ✓ 実装済み |
@@ -55,12 +59,6 @@
 ---
 
 ## 一般的だが未実装のコマンド
-
-### Camera Power
-| コマンド | バイトシーケンス | 優先度 | 備考 |
-|---------|----------------|-------|------|
-| Power On | `8X 01 04 00 02 FF` | 低 | Unityでは不要（常時ON） |
-| Power Off | `8X 01 04 00 03 FF` | 低 | Unityでは不要 |
 
 ### Pan/Tilt Extended
 | コマンド | バイトシーケンス | 優先度 | 備考 |
@@ -120,7 +118,6 @@ Unity Virtual Camera用途を考慮した優先度付け:
 
 ### 優先度: 低
 Virtual Camera用途では不要:
-- Camera Power系
 - White Balance系
 - Picture Effect系
 - Digital Zoom

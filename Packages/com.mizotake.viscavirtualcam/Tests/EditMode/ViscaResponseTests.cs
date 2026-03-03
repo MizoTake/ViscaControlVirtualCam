@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using NUnit.Framework;
 using ViscaControlVirtualCam;
 
@@ -113,6 +114,84 @@ public class ViscaResponseTests
         Assert.AreEqual(2, sent.Count, "Only ACK and Cancel should be sent");
         CollectionAssert.AreEqual(new byte[] { 0x90, 0x45, 0xFF }, sent[0]);
         CollectionAssert.AreEqual(new byte[] { 0x90, 0x65, 0x04, 0xFF }, sent[1]);
+    }
+
+    [Test]
+    public void InterfaceClear_ReturnsCompletionOnly()
+    {
+        var model = new PtzModel();
+        var handler = new PtzViscaHandler(model, a => a(), ViscaReplyMode.AckAndCompletion, _ => { });
+        var registry = new ViscaCommandRegistry();
+        var sent = new List<byte[]>();
+        var frame = new byte[] { 0x83, 0x01, 0x00, 0x01, 0xFF };
+
+        var context = registry.TryExecute(frame, handler, b => sent.Add(b));
+
+        Assert.IsTrue(context.HasValue);
+        Assert.AreEqual(ViscaCommandType.InterfaceClear, context.Value.CommandType);
+        Assert.AreEqual(1, sent.Count, "IF_Clear should return completion only");
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x53, 0xFF }, sent[0]);
+    }
+
+    [Test]
+    public void CameraPowerInquiry_ReturnsPowerOnByDefault()
+    {
+        var model = new PtzModel();
+        var handler = new PtzViscaHandler(model, a => a(), ViscaReplyMode.AckAndCompletion, _ => { });
+        var registry = new ViscaCommandRegistry();
+        byte[] sent = null;
+
+        var context = registry.TryExecute(new byte[] { 0x84, 0x09, 0x04, 0x00, 0xFF }, handler, b => sent = b);
+
+        Assert.IsTrue(context.HasValue);
+        Assert.AreEqual(ViscaCommandType.CameraPowerInquiry, context.Value.CommandType);
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x54, ViscaProtocol.PowerOn, 0xFF }, sent);
+    }
+
+    [Test]
+    public void CameraPower_SetOffThenInquiry_ReturnsPowerOff()
+    {
+        var model = new PtzModel();
+        var handler = new PtzViscaHandler(model, a => a(), ViscaReplyMode.AckAndCompletion, _ => { });
+        var registry = new ViscaCommandRegistry();
+        var responses = new List<byte[]>();
+
+        var setContext = registry.TryExecute(
+            new byte[] { 0x82, 0x01, 0x04, 0x00, ViscaProtocol.PowerOff, 0xFF },
+            handler,
+            b => responses.Add(b));
+
+        Assert.IsTrue(setContext.HasValue);
+        Assert.AreEqual(ViscaCommandType.CameraPower, setContext.Value.CommandType);
+        Assert.AreEqual(2, responses.Count, "Power set should return ACK and Completion");
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x42, 0xFF }, responses[0]);
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x52, 0xFF }, responses[1]);
+
+        responses.Clear();
+        registry.TryExecute(new byte[] { 0x82, 0x09, 0x04, 0x00, 0xFF }, handler, b => responses.Add(b));
+
+        Assert.AreEqual(1, responses.Count);
+        CollectionAssert.AreEqual(new byte[] { 0x90, 0x52, ViscaProtocol.PowerOff, 0xFF }, responses[0]);
+    }
+
+    [Test]
+    public void VersionInquiry_ReturnsVersionPayload()
+    {
+        var model = new PtzModel();
+        var handler = new PtzViscaHandler(model, a => a(), ViscaReplyMode.AckAndCompletion, _ => { });
+        var registry = new ViscaCommandRegistry();
+        byte[] sent = null;
+
+        var context = registry.TryExecute(new byte[] { 0x85, 0x09, 0x00, 0x02, 0xFF }, handler, b => sent = b);
+
+        Assert.IsTrue(context.HasValue);
+        Assert.AreEqual(ViscaCommandType.VersionInquiry, context.Value.CommandType);
+        Assert.IsNotNull(sent);
+        Assert.AreEqual(10, sent.Length);
+        Assert.AreEqual(0x90, sent[0]);
+        Assert.AreEqual(0x55, sent[1]);
+        Assert.AreEqual(ViscaProtocol.VersionMaxSocketCount, sent[8]);
+        Assert.AreEqual(0xFF, sent[9]);
     }
 
     private sealed class CapturingHandler : IViscaCommandHandler

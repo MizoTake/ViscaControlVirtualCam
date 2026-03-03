@@ -225,6 +225,7 @@
 - VISCA over IP ヘッダ受信時は `0x01 0x11` ヘッダで Sequence をエコーして返信する（ペイロード長 1–16 のみ）。
 - ACK/Completion/Error はソケット nibble（`Z`）を必ず反映 (`90 4Z/5Z/6Z ... FF`)。Raw VISCA 受信時の既定 `Z=1`。
 - Command Cancel (`8X 2Z FF`) に対応し、即時に `90 6Z 04 FF` を返す。ソケット番号は `2Z` バイトから抽出。
+- RM-IP500 互換向けに `Interface Clear(8X 01 00 01 FF)`、`Camera Power(8X 01 04 00 02/03 FF)`、`Power Inquiry(8X 09 04 00 FF)`、`Version Inquiry(8X 09 00 02 FF)` を実装。
 - VISCA over IP の Payload Length は 1〜16 を厳格に検証し、超過/不一致は `Message Length(0x01)` で応答。
 - バッファ満杯時は `Buffer Full(0x03)` を返却（内部キュー上限超過時）。状態不整合や処理不能例外時は `Not Executable(0x41)` を返す。
 - 構文不正/長さ超過時は Syntax(0x02) を返却。

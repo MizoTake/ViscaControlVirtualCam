@@ -17,6 +17,7 @@ namespace ViscaControlVirtualCam
         private readonly PtzModel _model;
         private readonly ViscaReplyMode _replyMode;
         private byte _focusMode = ViscaProtocol.FocusModeManual;
+        private byte _powerState = ViscaProtocol.PowerOn;
         private readonly ConcurrentDictionary<byte, SessionState> _sessions = new();
 
         public PtzViscaHandler(PtzModel model, Action<Action> mainThreadDispatcher, ViscaReplyMode replyMode,
@@ -58,8 +59,12 @@ namespace ViscaControlVirtualCam
                 ViscaCommandType.MemoryRecall => HandleMemoryRecall(ctx),
                 ViscaCommandType.MemorySet => HandleMemorySet(ctx),
                 ViscaCommandType.MemoryReset => HandleMemoryReset(ctx),
+                ViscaCommandType.InterfaceClear => HandleInterfaceClear(ctx),
+                ViscaCommandType.CameraPower => HandleCameraPower(ctx),
 
                 // Inquiry commands
+                ViscaCommandType.CameraPowerInquiry => HandleCameraPowerInquiry(ctx),
+                ViscaCommandType.VersionInquiry => HandleVersionInquiry(ctx),
                 ViscaCommandType.PanTiltPositionInquiry => HandlePanTiltPositionInquiry(ctx),
                 ViscaCommandType.ZoomPositionInquiry => HandleZoomPositionInquiry(ctx),
                 ViscaCommandType.FocusPositionInquiry => HandleFocusPositionInquiry(ctx),
@@ -235,6 +240,34 @@ namespace ViscaControlVirtualCam
             return true;
         }
 
+        private bool HandleInterfaceClear(in ViscaCommandContext ctx)
+        {
+            foreach (var kv in _sessions)
+            {
+                var session = kv.Value;
+                Interlocked.Exchange(ref session.PendingOperations, 0);
+                Interlocked.Increment(ref session.CancelGeneration);
+            }
+
+            // IF_Clear should complete immediately without ACK.
+            ViscaResponse.SendCompletion(ctx.Responder, _replyMode, ctx.SocketId);
+            return true;
+        }
+
+        private bool HandleCameraPower(in ViscaCommandContext ctx)
+        {
+            if (ctx.PowerState != ViscaProtocol.PowerOn && ctx.PowerState != ViscaProtocol.PowerOff)
+            {
+                ViscaResponse.SendError(ctx.Responder, ViscaProtocol.ErrorSyntax, ctx.SocketId);
+                return true;
+            }
+
+            _powerState = ctx.PowerState;
+            ViscaResponse.SendAck(ctx.Responder, _replyMode, ctx.SocketId);
+            ViscaResponse.SendCompletion(ctx.Responder, _replyMode, ctx.SocketId);
+            return true;
+        }
+
         private bool HandlePanTiltPositionInquiry(in ViscaCommandContext ctx)
         {
             var panRange = _model.PanMaxDeg - _model.PanMinDeg;
@@ -273,6 +306,23 @@ namespace ViscaControlVirtualCam
         private bool HandleFocusModeInquiry(in ViscaCommandContext ctx)
         {
             ViscaResponse.SendInquiryResponse8(ctx.Responder, _focusMode, ctx.SocketId);
+            return true;
+        }
+
+        private bool HandleCameraPowerInquiry(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendInquiryResponse8(ctx.Responder, _powerState, ctx.SocketId);
+            return true;
+        }
+
+        private bool HandleVersionInquiry(in ViscaCommandContext ctx)
+        {
+            ViscaResponse.SendVersionInquiryResponse(ctx.Responder,
+                ViscaProtocol.VersionVendorId,
+                ViscaProtocol.VersionModelId,
+                ViscaProtocol.VersionRomVersion,
+                ViscaProtocol.VersionMaxSocketCount,
+                ctx.SocketId);
             return true;
         }
 
