@@ -8,6 +8,13 @@ namespace ViscaControlVirtualCam.Editor
     {
         private SerializedProperty autoStart;
         private SerializedProperty bindAddress;
+        private SerializedProperty enableIpSetupResponder;
+        private SerializedProperty ipSetupAdvertisedAddressSource;
+        private SerializedProperty ipSetupCustomAdvertisedAddress;
+        private SerializedProperty ipSetupEnqDebounceMilliseconds;
+        private SerializedProperty ipSetupIdentity;
+        private SerializedProperty ipSetupPort;
+        private SerializedProperty ipSetupResponderMode;
         private SerializedProperty logLevel;
         private SerializedProperty logReceivedCommands;
         private SerializedProperty maxClients;
@@ -30,6 +37,13 @@ namespace ViscaControlVirtualCam.Editor
             tcpPort = serializedObject.FindProperty("tcpPort");
             maxClients = serializedObject.FindProperty("maxClients");
             replyMode = serializedObject.FindProperty("replyMode");
+            enableIpSetupResponder = serializedObject.FindProperty("enableIpSetupResponder");
+            ipSetupPort = serializedObject.FindProperty("ipSetupPort");
+            ipSetupResponderMode = serializedObject.FindProperty("ipSetupResponderMode");
+            ipSetupAdvertisedAddressSource = serializedObject.FindProperty("ipSetupAdvertisedAddressSource");
+            ipSetupCustomAdvertisedAddress = serializedObject.FindProperty("ipSetupCustomAdvertisedAddress");
+            ipSetupEnqDebounceMilliseconds = serializedObject.FindProperty("ipSetupEnqDebounceMilliseconds");
+            ipSetupIdentity = serializedObject.FindProperty("ipSetupIdentity");
             operationMode = serializedObject.FindProperty("operationMode");
             realCameraIp = serializedObject.FindProperty("realCameraIp");
             realCameraPort = serializedObject.FindProperty("realCameraPort");
@@ -61,9 +75,24 @@ namespace ViscaControlVirtualCam.Editor
             }
 
             EditorGUILayout.Space();
+            EditorGUILayout.PropertyField(enableIpSetupResponder);
+            if (enableIpSetupResponder.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(ipSetupPort);
+                EditorGUILayout.PropertyField(ipSetupResponderMode);
+                EditorGUILayout.PropertyField(ipSetupAdvertisedAddressSource);
+                if ((IpSetupAdvertisedAddressSource)ipSetupAdvertisedAddressSource.enumValueIndex ==
+                    IpSetupAdvertisedAddressSource.CustomAddress)
+                    EditorGUILayout.PropertyField(ipSetupCustomAdvertisedAddress);
+                EditorGUILayout.PropertyField(ipSetupEnqDebounceMilliseconds);
+                EditorGUILayout.PropertyField(ipSetupIdentity, true);
+                EditorGUI.indentLevel--;
+            }
+
+            EditorGUILayout.Space();
 
             // Logging section
-            EditorGUILayout.LabelField("Logging", EditorStyles.boldLabel);
             EditorGUILayout.PropertyField(verboseLog);
 
             // Only show detailed logging options if verboseLog is enabled

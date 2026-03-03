@@ -1,0 +1,260 @@
+using System;
+using System.Collections.Generic;
+using System.Net;
+using System.Net.Sockets;
+using System.Text;
+
+namespace ViscaControlVirtualCam
+{
+    public sealed class IpSetupMessageProcessor
+    {
+        private readonly Func<IPAddress, string> _advertisedIpResolver;
+        private readonly VirtualDeviceIdentity _identity;
+        private readonly VirtualNetworkConfig _network;
+
+        public IpSetupMessageProcessor(
+            VirtualDeviceIdentity identity,
+            VirtualNetworkConfig network,
+            Func<IPAddress, string> advertisedIpResolver)
+        {
+            _identity = identity ?? throw new ArgumentNullException(nameof(identity));
+            _network = network ?? throw new ArgumentNullException(nameof(network));
+            _advertisedIpResolver = advertisedIpResolver;
+        }
+
+        public IpSetupProcessResult Process(IPEndPoint remoteEndpoint, IReadOnlyList<string> rawUnits)
+        {
+            if (rawUnits == null || rawUnits.Count == 0)
+                return new IpSetupProcessResult
+                {
+                    ShouldRespond = false,
+                    Summary = "IPSETUP Ignored: no units."
+                };
+
+            var units = ParseUnits(rawUnits);
+            var isEnq = ContainsKey(units, "ENQ");
+            var isSet = ContainsKey(units, "SET") ||
+                        ContainsKey(units, "SETMAC") ||
+                        ContainsKey(units, "IPADR") ||
+                        ContainsKey(units, "MASK") ||
+                        ContainsKey(units, "GATEWAY") ||
+                        ContainsKey(units, "WEBPORT") ||
+                        ContainsKey(units, "NAME");
+
+            if (isEnq)
+                return HandleEnq(units, remoteEndpoint);
+
+            if (isSet)
+                return HandleSet(units, remoteEndpoint);
+
+            return new IpSetupProcessResult
+            {
+                ShouldRespond = false,
+                Summary = "IPSETUP Ignored: unsupported request."
+            };
+        }
+
+        private IpSetupProcessResult HandleEnq(List<IpSetupUnit> units, IPEndPoint remoteEndpoint)
+        {
+            var enqSelector = TryGetValue(units, "ENQ", out var value) && !string.IsNullOrWhiteSpace(value)
+                ? value
+                : "allinfo";
+            var advertisedIp = ResolveAdvertisedIp(remoteEndpoint?.Address);
+
+            var response = new List<string>
+            {
+                "ACK:ENQ",
+                $"INFO:{enqSelector}"
+            };
+            AppendInfoUnits(response, advertisedIp);
+
+            return new IpSetupProcessResult
+            {
+                ShouldRespond = true,
+                IsEnq = true,
+                Summary = $"IPSETUP ENQ handled ({enqSelector})",
+                ResponseUnits = response.ToArray()
+            };
+        }
+
+        private IpSetupProcessResult HandleSet(List<IpSetupUnit> units, IPEndPoint remoteEndpoint)
+        {
+            if (!TryGetValue(units, "SETMAC", out var setMac))
+                return BuildNak("SETMAC_REQUIRED");
+
+            if (!TryNormalizeMac(setMac, out var normalizedSetMac))
+                return BuildNak("INVALID_SETMAC");
+
+            if (!string.Equals(normalizedSetMac, _identity.virtualMac, StringComparison.OrdinalIgnoreCase))
+                return BuildNak("MAC_MISMATCH");
+
+            if (TryGetValue(units, "IPADR", out var ipadr))
+            {
+                if (!IsValidIpv4(ipadr))
+                    return BuildNak("INVALID_IPADR");
+                _network.logicalIp = ipadr;
+            }
+
+            if (TryGetValue(units, "MASK", out var mask))
+            {
+                if (!IsValidIpv4(mask))
+                    return BuildNak("INVALID_MASK");
+                _network.logicalMask = mask;
+            }
+
+            if (TryGetValue(units, "GATEWAY", out var gateway))
+            {
+                if (!IsValidIpv4(gateway))
+                    return BuildNak("INVALID_GATEWAY");
+                _network.logicalGateway = gateway;
+            }
+
+            if (TryGetValue(units, "WEBPORT", out var webPortRaw))
+            {
+                if (!int.TryParse(webPortRaw, out var webPort) || webPort <= 0 || webPort > 65535)
+                    return BuildNak("INVALID_WEBPORT");
+                _identity.webPort = webPort;
+            }
+
+            if (TryGetValue(units, "NAME", out var name) &&
+                !string.IsNullOrWhiteSpace(name))
+                _identity.friendlyName = name;
+
+            var advertisedIp = ResolveAdvertisedIp(remoteEndpoint?.Address);
+
+            var response = new List<string>
+            {
+                "ACK:SET"
+            };
+            AppendInfoUnits(response, advertisedIp);
+
+            return new IpSetupProcessResult
+            {
+                ShouldRespond = true,
+                IsSet = true,
+                Summary = "IPSETUP SET accepted",
+                ResponseUnits = response.ToArray()
+            };
+        }
+
+        private void AppendInfoUnits(List<string> response, string advertisedIp)
+        {
+            response.Add($"MAC:{_identity.virtualMac}");
+            response.Add($"MODEL:{_identity.modelName}");
+            response.Add($"MODELNAME:{_identity.modelName}");
+            response.Add($"SERIAL:{_identity.serial}");
+            response.Add($"SOFTVERSION:{_identity.softVersion}");
+            response.Add($"IPADR:{advertisedIp}");
+            response.Add($"MASK:{_network.logicalMask}");
+            response.Add($"GATEWAY:{_network.logicalGateway}");
+            response.Add($"WEBPORT:{_identity.webPort}");
+            response.Add($"NAME:{_identity.friendlyName}");
+        }
+
+        private IpSetupProcessResult BuildNak(string reason)
+        {
+            return new IpSetupProcessResult
+            {
+                ShouldRespond = true,
+                IsSet = true,
+                Summary = $"IPSETUP SET rejected ({reason})",
+                ResponseUnits = new[] { $"NAK:{reason}" }
+            };
+        }
+
+        private string ResolveAdvertisedIp(IPAddress remoteAddress)
+        {
+            var resolved = _advertisedIpResolver?.Invoke(remoteAddress);
+            if (IsValidIpv4(resolved))
+                return resolved;
+
+            return IsValidIpv4(_network.logicalIp) ? _network.logicalIp : "127.0.0.1";
+        }
+
+        private static bool IsValidIpv4(string value)
+        {
+            return IPAddress.TryParse(value, out var address) && address.AddressFamily == AddressFamily.InterNetwork;
+        }
+
+        public static bool TryNormalizeMac(string input, out string normalized)
+        {
+            normalized = null;
+            if (string.IsNullOrWhiteSpace(input))
+                return false;
+
+            var hex = new StringBuilder(12);
+            for (var i = 0; i < input.Length; i++)
+            {
+                var c = input[i];
+                if (Uri.IsHexDigit(c))
+                    hex.Append(char.ToUpperInvariant(c));
+            }
+
+            if (hex.Length != 12)
+                return false;
+
+            normalized = string.Concat(
+                hex[0], hex[1], ":",
+                hex[2], hex[3], ":",
+                hex[4], hex[5], ":",
+                hex[6], hex[7], ":",
+                hex[8], hex[9], ":",
+                hex[10], hex[11]);
+            return true;
+        }
+
+        private static bool ContainsKey(List<IpSetupUnit> units, string key)
+        {
+            for (var i = 0; i < units.Count; i++)
+                if (string.Equals(units[i].Key, key, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            return false;
+        }
+
+        private static bool TryGetValue(List<IpSetupUnit> units, string key, out string value)
+        {
+            for (var i = units.Count - 1; i >= 0; i--)
+                if (string.Equals(units[i].Key, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    value = units[i].Value;
+                    return true;
+                }
+
+            value = null;
+            return false;
+        }
+
+        private static List<IpSetupUnit> ParseUnits(IReadOnlyList<string> rawUnits)
+        {
+            var units = new List<IpSetupUnit>(rawUnits.Count);
+            for (var i = 0; i < rawUnits.Count; i++)
+            {
+                var raw = rawUnits[i] ?? string.Empty;
+                var idx = raw.IndexOf(':');
+                if (idx < 0)
+                {
+                    units.Add(new IpSetupUnit(raw.Trim(), string.Empty));
+                    continue;
+                }
+
+                var key = raw.Substring(0, idx).Trim();
+                var value = idx + 1 < raw.Length ? raw.Substring(idx + 1).Trim() : string.Empty;
+                units.Add(new IpSetupUnit(key, value));
+            }
+
+            return units;
+        }
+
+        private readonly struct IpSetupUnit
+        {
+            public readonly string Key;
+            public readonly string Value;
+
+            public IpSetupUnit(string key, string value)
+            {
+                Key = key ?? string.Empty;
+                Value = value ?? string.Empty;
+            }
+        }
+    }
+}

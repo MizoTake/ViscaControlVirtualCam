@@ -116,6 +116,12 @@ https://github.com/MizoTake/ViscaControlVirtualCam.git?path=/Packages/com.mizota
 - コネクション指向、フレームフレーミング対応
 - 複数クライアント対応（最大数は設定可能）
 
+### Sony IP Setup Responder（UDP 52380）
+- RM-IP500 の AUTO IP SETUP / Auto Assign 向け探索応答に対応
+- 設定値は Unity Inspector の `ViscaServerBehaviour` 上で管理
+- 応答 `IPADR` は `bindAddress` と同一にするか、カスタムIPを指定するかを選択
+- 応答モードは `Unicast` / `Broadcast` を選択可能
+
 ## 拡張
 
 ### カスタムコマンドの追加

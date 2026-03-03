@@ -22,6 +22,16 @@ namespace ViscaControlVirtualCam
         public ViscaReplyMode replyMode = ViscaReplyMode.AckAndCompletion;
         [Min(1)] public int pendingQueueLimit = 64;
 
+        [Header("IP Setup (UDP 52380)")] public bool enableIpSetupResponder = true;
+
+        [Min(1)] public int ipSetupPort = 52380;
+        public IpSetupResponderMode ipSetupResponderMode = IpSetupResponderMode.Unicast;
+        public IpSetupAdvertisedAddressSource ipSetupAdvertisedAddressSource = IpSetupAdvertisedAddressSource.BindAddress;
+        [Tooltip("Used when Advertised Address Source = CustomAddress")]
+        public string ipSetupCustomAdvertisedAddress = "127.0.0.1";
+        [Min(0)] public int ipSetupEnqDebounceMilliseconds = 250;
+        public VirtualDeviceIdentity ipSetupIdentity = new VirtualDeviceIdentity();
+
         [Header("Operation Mode")] public ViscaOperationMode operationMode = ViscaOperationMode.VirtualOnly;
 
         [Header("Real Camera Forwarding")] public string realCameraIp = "192.168.1.10";
@@ -41,8 +51,10 @@ namespace ViscaControlVirtualCam
         [Header("Targets")] public PtzControllerBehaviour ptzController;
 
         private readonly ConcurrentQueue<Action> _mainThreadActions = new();
+        private readonly VirtualNetworkConfig _ipSetupNetwork = new();
         private ViscaServerCore _core;
         private ViscaForwarder _forwarder;
+        private IpSetupResponder _ipSetupResponder;
 
         private void Awake()
         {
@@ -85,6 +97,8 @@ namespace ViscaControlVirtualCam
             {
                 return;
             }
+
+            StartIpSetupResponder(bindIpAddress);
 
             var handler = new PtzViscaHandler(ptzController.Model, a => _mainThreadActions.Enqueue(a), replyMode,
                 msg => LogMessage(msg), pendingQueueLimit);
@@ -142,6 +156,7 @@ namespace ViscaControlVirtualCam
             {
                 _forwarder?.Dispose();
                 _forwarder = null;
+                StopIpSetupResponder();
                 throw;
             }
         }
@@ -190,6 +205,8 @@ namespace ViscaControlVirtualCam
 
         public void StopServer()
         {
+            StopIpSetupResponder();
+
             try
             {
                 _core?.Stop();
@@ -212,6 +229,125 @@ namespace ViscaControlVirtualCam
             }
 
             _forwarder = null;
+        }
+
+        private void StartIpSetupResponder(IPAddress viscaBindAddress)
+        {
+            StopIpSetupResponder();
+            if (!enableIpSetupResponder) return;
+
+            if (ipSetupPort <= 0 || ipSetupPort > 65535)
+            {
+                Debug.LogError($"[VISCA] Invalid ipSetupPort: {ipSetupPort}. Use 1-65535.");
+                return;
+            }
+
+            try
+            {
+                if (!TryResolveIpSetupAdvertisedAddress(viscaBindAddress, out var advertisedAddress))
+                    return;
+
+                EnsureIpSetupDefaults(advertisedAddress);
+
+                var processor = new IpSetupMessageProcessor(
+                    ipSetupIdentity,
+                    _ipSetupNetwork,
+                    _ => advertisedAddress);
+
+                var options = new IpSetupResponderOptions
+                {
+                    BindAddress = IPAddress.Any,
+                    Port = ipSetupPort,
+                    ResponderMode = ipSetupResponderMode,
+                    EnqDebounceMilliseconds = Math.Max(0, ipSetupEnqDebounceMilliseconds)
+                };
+
+                _ipSetupResponder = new IpSetupResponder(processor, options, msg => LogMessage(msg));
+                _ipSetupResponder.Start();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[VISCA] Failed to start IP setup responder: {e.Message}");
+                StopIpSetupResponder();
+            }
+        }
+
+        private void StopIpSetupResponder()
+        {
+            try
+            {
+                _ipSetupResponder?.Stop();
+                _ipSetupResponder?.Dispose();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[VISCA] IP setup responder stop error: {e.Message}");
+            }
+
+            _ipSetupResponder = null;
+        }
+
+        private void EnsureIpSetupDefaults(string advertisedAddress)
+        {
+            ipSetupIdentity ??= new VirtualDeviceIdentity();
+
+            if (!IpSetupMessageProcessor.TryNormalizeMac(ipSetupIdentity.virtualMac, out var normalizedMac))
+                normalizedMac = "02:00:00:00:00:01";
+            ipSetupIdentity.virtualMac = normalizedMac;
+
+            if (string.IsNullOrWhiteSpace(ipSetupIdentity.modelName))
+                ipSetupIdentity.modelName = "BRC-X400";
+            if (string.IsNullOrWhiteSpace(ipSetupIdentity.serial))
+                ipSetupIdentity.serial = "VC000001";
+            if (string.IsNullOrWhiteSpace(ipSetupIdentity.softVersion))
+                ipSetupIdentity.softVersion = "1.00";
+            if (ipSetupIdentity.webPort <= 0 || ipSetupIdentity.webPort > 65535)
+                ipSetupIdentity.webPort = 80;
+            if (string.IsNullOrWhiteSpace(ipSetupIdentity.friendlyName))
+                ipSetupIdentity.friendlyName = "Visca Virtual Cam";
+
+            if (!TryParseIpv4(_ipSetupNetwork.logicalIp, out _))
+                _ipSetupNetwork.logicalIp = advertisedAddress;
+            if (!TryParseIpv4(_ipSetupNetwork.logicalMask, out _))
+                _ipSetupNetwork.logicalMask = "255.255.255.0";
+            if (!TryParseIpv4(_ipSetupNetwork.logicalGateway, out _))
+                _ipSetupNetwork.logicalGateway = "0.0.0.0";
+        }
+
+        private bool TryResolveIpSetupAdvertisedAddress(IPAddress viscaBindAddress, out string advertisedAddress)
+        {
+            advertisedAddress = null;
+
+            if (ipSetupAdvertisedAddressSource == IpSetupAdvertisedAddressSource.BindAddress)
+            {
+                var value = viscaBindAddress?.ToString();
+                if (!TryParseIpv4(value, out _))
+                {
+                    Debug.LogError(
+                        $"[VISCA] IP Setup advertised address source is BindAddress but bindAddress '{bindAddress}' is not a concrete IPv4. Use a NIC IP or CustomAddress.");
+                    return false;
+                }
+
+                advertisedAddress = value;
+                return true;
+            }
+
+            if (!TryParseIpv4(ipSetupCustomAdvertisedAddress, out _))
+            {
+                Debug.LogError(
+                    $"[VISCA] Invalid ipSetupCustomAdvertisedAddress: '{ipSetupCustomAdvertisedAddress}'. Use IPv4 like 192.168.0.100.");
+                return false;
+            }
+
+            advertisedAddress = ipSetupCustomAdvertisedAddress.Trim();
+            return true;
+        }
+
+        private static bool TryParseIpv4(string value, out IPAddress address)
+        {
+            if (!IPAddress.TryParse(value, out address))
+                return false;
+            return address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork;
         }
 
         private bool TryParseBindAddress(out IPAddress address)
