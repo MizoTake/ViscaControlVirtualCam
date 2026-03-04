@@ -35,6 +35,7 @@ namespace ViscaControlVirtualCam
             var isEnq = ContainsKey(units, "ENQ");
             var isSet = ContainsKey(units, "SET") ||
                         ContainsKey(units, "SETMAC") ||
+                        ContainsKey(units, "MAC") ||
                         ContainsKey(units, "IPADR") ||
                         ContainsKey(units, "MASK") ||
                         ContainsKey(units, "GATEWAY") ||
@@ -74,7 +75,7 @@ namespace ViscaControlVirtualCam
 
         private IpSetupProcessResult HandleSet(List<IpSetupUnit> units)
         {
-            if (!TryGetValue(units, "SETMAC", out var setMac))
+            if (!TryGetSetMac(units, out var setMac))
                 return BuildNak("SETMAC_REQUIRED");
 
             if (!TryNormalizeMac(setMac, out var normalizedSetMac))
@@ -87,9 +88,17 @@ namespace ViscaControlVirtualCam
             {
                 ShouldRespond = true,
                 IsSet = true,
-                Summary = "IPSETUP SETMAC accepted",
+                Summary = "IPSETUP SET/MAC accepted",
                 ResponseUnits = new[] { $"ACK:{normalizedSetMac}" }
             };
+        }
+
+        private static bool TryGetSetMac(List<IpSetupUnit> units, out string setMac)
+        {
+            if (TryGetValue(units, "SETMAC", out setMac))
+                return true;
+
+            return TryGetValue(units, "MAC", out setMac);
         }
 
         private string[] BuildNetworkInfoUnits(string selector, string advertisedIp)

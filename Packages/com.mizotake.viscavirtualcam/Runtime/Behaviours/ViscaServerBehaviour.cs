@@ -25,7 +25,7 @@ namespace ViscaControlVirtualCam
         [Header("IP Setup (UDP 52380)")] public bool enableIpSetupResponder = true;
 
         [Min(1)] public int ipSetupPort = 52380;
-        public IpSetupResponderMode ipSetupResponderMode = IpSetupResponderMode.Unicast;
+        public IpSetupResponderMode ipSetupResponderMode = IpSetupResponderMode.Broadcast;
         public IpSetupAdvertisedAddressSource ipSetupAdvertisedAddressSource = IpSetupAdvertisedAddressSource.BindAddress;
         [Tooltip("Used when Advertised Address Source = CustomAddress")]
         public string ipSetupCustomAdvertisedAddress = "192.168.0.100";
