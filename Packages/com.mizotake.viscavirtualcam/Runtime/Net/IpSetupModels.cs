@@ -38,7 +38,7 @@ namespace ViscaControlVirtualCam
     {
         public IPAddress BindAddress = IPAddress.Any;
         public int Port = ViscaProtocol.DefaultTcpPort;
-        public IpSetupResponderMode ResponderMode = IpSetupResponderMode.Unicast;
+        public IpSetupResponderMode ResponderMode = IpSetupResponderMode.Broadcast;
         public int EnqDebounceMilliseconds = 250;
     }
 

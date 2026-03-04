@@ -133,6 +133,29 @@ public class IpSetupProtocolTests
     }
 
     [Test]
+    public void MessageProcessor_Set_WithMacKeyMatchingMac_ReturnsSingleAckUnit()
+    {
+        var identity = new VirtualDeviceIdentity
+        {
+            virtualMac = "88-C9-E8-00-00-03"
+        };
+        var network = new VirtualNetworkConfig();
+
+        var processor = new IpSetupMessageProcessor(
+            identity,
+            network,
+            _ => "192.168.1.50");
+
+        var units = new[] { "SET:network", "MAC:88-C9-E8-00-00-03" };
+
+        var result = processor.Process(new IPEndPoint(IPAddress.Parse("192.168.1.10"), 52380), units);
+
+        Assert.IsTrue(result.ShouldRespond);
+        Assert.IsTrue(result.IsSet);
+        CollectionAssert.AreEqual(new[] { "ACK:88-C9-E8-00-00-03" }, result.ResponseUnits);
+    }
+
+    [Test]
     public void MessageProcessor_Set_WithMacMismatch_ReturnsNak()
     {
         var identity = new VirtualDeviceIdentity { virtualMac = "88-C9-E8-00-00-03" };
@@ -152,7 +175,7 @@ public class IpSetupProtocolTests
     }
 
     [Test]
-    public void MessageProcessor_Set_WithoutSetMac_ReturnsSetMacRequiredNak()
+    public void MessageProcessor_Set_WithoutSetMacOrMac_ReturnsSetMacRequiredNak()
     {
         var identity = new VirtualDeviceIdentity { virtualMac = "88-C9-E8-00-00-03" };
         var processor = new IpSetupMessageProcessor(
