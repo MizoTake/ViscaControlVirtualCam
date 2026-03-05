@@ -81,6 +81,9 @@ namespace ViscaControlVirtualCam
         [Tooltip("上下の操作を反転する")]
         public bool invertTilt;
 
+        [Tooltip("ズームの増減方向を反転する")]
+        public bool invertZoom = true;
+
         [Tooltip("パンの絶対位置マッピングを反転する")]
         public bool invertPanAbsolute;
 
@@ -159,6 +162,7 @@ namespace ViscaControlVirtualCam
             model.TiltVmax = tiltVmax;
             model.InvertPan = invertPan;
             model.InvertTilt = invertTilt;
+            model.InvertZoom = invertZoom;
             model.InvertPanAbsolute = invertPanAbsolute;
             model.InvertTiltAbsolute = invertTiltAbsolute;
             model.UseSlowPanTilt = useSlowPanTilt;

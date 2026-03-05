@@ -74,6 +74,7 @@ namespace ViscaControlVirtualCam
         public bool InvertPanAbsolute;
         public bool InvertTilt;
         public bool InvertTiltAbsolute;
+        public bool InvertZoom;
 
         // Iris limits
         public float IrisMax = 65535f;
@@ -222,18 +223,19 @@ namespace ViscaControlVirtualCam
             var p = PtzMathUtils.Clamp(zz & 0x0F, 0, 7);
             var speedFactor = (float)Math.Pow(p / 7f, Math.Max(0.01f, SpeedGamma));
             var isTele = dirNibble == ViscaProtocol.ZoomTeleNibble;
+            var invertSign = InvertZoom ? -1f : 1f;
             if (UseZoomPositionSpeed)
             {
                 var speed = speedFactor * GetZoomMaxNormalizedPerSec();
                 var sign = isTele ? 1f : -1f;
-                _omegaZoom = speed * sign;
+                _omegaZoom = speed * sign * invertSign;
                 _omegaFov = 0f;
             }
             else
             {
                 var speed = speedFactor * ZoomMaxFovPerSec;
                 var sign = isTele ? -1f : +1f;
-                _omegaFov = speed * sign;
+                _omegaFov = speed * sign * invertSign;
                 _omegaZoom = 0f;
             }
         }
