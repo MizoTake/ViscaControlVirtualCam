@@ -58,6 +58,15 @@ namespace ViscaControlVirtualCam
                 targetCamera.fieldOfView = step.NewFovDeg;
         }
 
+        public void ApplyInquiryStatus(in ViscaInquiryStatus status)
+        {
+            if (Model == null)
+                return;
+
+            Model.SyncFromViscaPositions(status.PanRaw, status.TiltRaw, status.ZoomRaw);
+            ApplyPoseToRig(Model.CurrentPanDeg, Model.CurrentTiltDeg, Model.CurrentFovDeg);
+        }
+
 #if UNITY_EDITOR
         private void OnValidate()
         {
@@ -82,6 +91,26 @@ namespace ViscaControlVirtualCam
             if (settings != null) settings.ApplyTo(Model);
 
             if (tuningProfile != null) tuningProfile.ApplyTo(Model);
+        }
+
+        private void ApplyPoseToRig(float panDeg, float tiltDeg, float fovDeg)
+        {
+            if (panPivot != null)
+            {
+                var euler = panPivot.localEulerAngles;
+                euler.y = panDeg;
+                panPivot.localEulerAngles = euler;
+            }
+
+            if (tiltPivot != null)
+            {
+                var euler = tiltPivot.localEulerAngles;
+                euler.x = -tiltDeg;
+                tiltPivot.localEulerAngles = euler;
+            }
+
+            if (targetCamera != null)
+                targetCamera.fieldOfView = fovDeg;
         }
     }
 }

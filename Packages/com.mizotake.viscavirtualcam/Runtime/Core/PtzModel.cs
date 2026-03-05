@@ -653,6 +653,28 @@ namespace ViscaControlVirtualCam
             return (ushort)(Clamp01(zoomNorm) * 65535f);
         }
 
+        public void SyncFromViscaPositions(ushort panPos, ushort tiltPos, ushort zoomPos)
+        {
+            var panNorm = panPos / 65535f;
+            var tiltNorm = tiltPos / 65535f;
+            if (InvertPanAbsolute) panNorm = 1f - panNorm;
+            if (InvertTiltAbsolute) tiltNorm = 1f - tiltNorm;
+
+            var panDeg = PtzMathUtils.Lerp(PanMinDeg, PanMaxDeg, Clamp01(panNorm));
+            var tiltDeg = PtzMathUtils.Lerp(TiltMinDeg, TiltMaxDeg, Clamp01(tiltNorm));
+            var fovDeg = GetFovFromZoomPosition(zoomPos);
+            SyncPose(panDeg, tiltDeg, fovDeg);
+        }
+
+        public void SyncPose(float panDeg, float tiltDeg, float fovDeg)
+        {
+            CurrentPanDeg = PtzMathUtils.Clamp(panDeg, PanMinDeg, PanMaxDeg);
+            CurrentTiltDeg = PtzMathUtils.Clamp(tiltDeg, TiltMinDeg, TiltMaxDeg);
+            GetFovLimits(out var fovMin, out var fovMax);
+            CurrentFovDeg = PtzMathUtils.Clamp(fovDeg, fovMin, fovMax);
+            ClearMotionState();
+        }
+
         private float GetPanTiltZoomScale(float currentFovDeg)
         {
             if (!EnablePanTiltSpeedScaleByZoom) return 1f;
@@ -828,6 +850,33 @@ namespace ViscaControlVirtualCam
         private static float Clamp01(float v)
         {
             return v < 0f ? 0f : v > 1f ? 1f : v;
+        }
+
+        private void ClearMotionState()
+        {
+            _omegaPan = 0f;
+            _omegaTilt = 0f;
+            _omegaFov = 0f;
+            _omegaZoom = 0f;
+            _omegaFocus = 0f;
+            _omegaIris = 0f;
+            _omegaPanCurrent = 0f;
+            _omegaTiltCurrent = 0f;
+            _omegaFovCurrent = 0f;
+            _omegaZoomCurrent = 0f;
+            _panVelSmoothed = 0f;
+            _tiltVelSmoothed = 0f;
+            _zoomVelSmoothed = 0f;
+
+            _targetPanDeg = null;
+            _targetTiltDeg = null;
+            _targetFov = null;
+            _targetFocus = null;
+            _targetIris = null;
+            _targetPanSpeedLimit = 0f;
+            _targetPanSpeedFloor = 0f;
+            _targetTiltSpeedLimit = 0f;
+            _targetTiltSpeedFloor = 0f;
         }
 
         private static float ApplyAccelLimit(float current, float target, float accel, float decel, float dt)

@@ -56,6 +56,8 @@
 | Focus Position Inquiry | `8X 09 04 48 FF` | ✓ 実装済み |
 | Focus Mode Inquiry | `8X 09 04 38 FF` | ✓ 実装済み |
 
+補足: 実機同期用途として `ViscaInquiryClient` を追加し、Pan/Tilt/Zoom Inquiry を定期送信して Unity 側リグへ反映できる。
+
 ---
 
 ## 一般的だが未実装のコマンド

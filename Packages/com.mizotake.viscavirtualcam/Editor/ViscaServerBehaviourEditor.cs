@@ -7,8 +7,13 @@ namespace ViscaControlVirtualCam.Editor
     public class ViscaServerBehaviourEditor : UnityEditor.Editor
     {
         private SerializedProperty autoStart;
+        private SerializedProperty applyInquiryToVirtualCamera;
         private SerializedProperty bindAddress;
+        private SerializedProperty enableInquiryPolling;
         private SerializedProperty enableIpSetupResponder;
+        private SerializedProperty inquiryPollingIntervalMs;
+        private SerializedProperty inquiryRetryCount;
+        private SerializedProperty inquiryTimeoutMs;
         private SerializedProperty ipSetupAdvertisedAddressSource;
         private SerializedProperty ipSetupCustomAdvertisedAddress;
         private SerializedProperty ipSetupEnqDebounceMilliseconds;
@@ -51,6 +56,11 @@ namespace ViscaControlVirtualCam.Editor
             operationMode = serializedObject.FindProperty("operationMode");
             realCameraIp = serializedObject.FindProperty("realCameraIp");
             realCameraPort = serializedObject.FindProperty("realCameraPort");
+            enableInquiryPolling = serializedObject.FindProperty("enableInquiryPolling");
+            inquiryPollingIntervalMs = serializedObject.FindProperty("inquiryPollingIntervalMs");
+            inquiryTimeoutMs = serializedObject.FindProperty("inquiryTimeoutMs");
+            inquiryRetryCount = serializedObject.FindProperty("inquiryRetryCount");
+            applyInquiryToVirtualCamera = serializedObject.FindProperty("applyInquiryToVirtualCamera");
             verboseLog = serializedObject.FindProperty("verboseLog");
             logReceivedCommands = serializedObject.FindProperty("logReceivedCommands");
             logLevel = serializedObject.FindProperty("logLevel");
@@ -77,6 +87,17 @@ namespace ViscaControlVirtualCam.Editor
             {
                 EditorGUILayout.PropertyField(realCameraIp);
                 EditorGUILayout.PropertyField(realCameraPort);
+            }
+
+            EditorGUILayout.PropertyField(enableInquiryPolling);
+            if (enableInquiryPolling.boolValue)
+            {
+                EditorGUI.indentLevel++;
+                EditorGUILayout.PropertyField(inquiryPollingIntervalMs);
+                EditorGUILayout.PropertyField(inquiryTimeoutMs);
+                EditorGUILayout.PropertyField(inquiryRetryCount);
+                EditorGUILayout.PropertyField(applyInquiryToVirtualCamera);
+                EditorGUI.indentLevel--;
             }
 
             EditorGUILayout.Space();

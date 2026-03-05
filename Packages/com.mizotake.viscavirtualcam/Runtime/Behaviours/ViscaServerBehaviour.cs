@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Net;
+using System.Threading;
 using UnityEngine;
 
 namespace ViscaControlVirtualCam
@@ -40,6 +41,14 @@ namespace ViscaControlVirtualCam
         [Min(1)]
         public int realCameraPort = 52381;
 
+        [Header("Inquiry Polling (Real Camera -> Virtual Sync)")]
+        public bool enableInquiryPolling = false;
+
+        [Min(20)] public int inquiryPollingIntervalMs = 100;
+        [Min(1)] public int inquiryTimeoutMs = 150;
+        [Min(0)] public int inquiryRetryCount = 1;
+        public bool applyInquiryToVirtualCamera = true;
+
         [Header("Logging")] [Tooltip("Enable general logging (connection events, errors, etc.)")]
         public bool verboseLog = true;
 
@@ -52,8 +61,12 @@ namespace ViscaControlVirtualCam
         [Header("Targets")] public PtzControllerBehaviour ptzController;
 
         private readonly ConcurrentQueue<Action> _mainThreadActions = new();
+        private readonly ManualResetEventSlim _inquiryStopEvent = new(false);
         private ViscaServerCore _core;
         private ViscaForwarder _forwarder;
+        private ViscaInquiryClient _inquiryClient;
+        private Thread _inquiryThread;
+        private volatile bool _inquiryRunning;
         private IpSetupResponder _ipSetupResponder;
 
         private void Awake()
@@ -151,9 +164,11 @@ namespace ViscaControlVirtualCam
             try
             {
                 _core.Start();
+                StartInquiryPolling();
             }
             catch
             {
+                StopInquiryPolling();
                 _forwarder?.Dispose();
                 _forwarder = null;
                 StopIpSetupResponder();
@@ -205,6 +220,7 @@ namespace ViscaControlVirtualCam
 
         public void StopServer()
         {
+            StopInquiryPolling();
             StopIpSetupResponder();
 
             try
@@ -229,6 +245,98 @@ namespace ViscaControlVirtualCam
             }
 
             _forwarder = null;
+        }
+
+        private void StartInquiryPolling()
+        {
+            StopInquiryPolling();
+
+            if (!enableInquiryPolling || !applyInquiryToVirtualCamera)
+                return;
+            if (ptzController == null)
+            {
+                LogMessage("Inquiry polling skipped: ptzController is not assigned.");
+                return;
+            }
+            if (ptzController.Model == null)
+            {
+                LogMessage("Inquiry polling skipped: ptzController.Model is null.");
+                return;
+            }
+
+            try
+            {
+                _inquiryClient = new ViscaInquiryClient(
+                    realCameraIp,
+                    realCameraPort,
+                    Mathf.Max(1, inquiryTimeoutMs),
+                    Mathf.Max(0, inquiryRetryCount),
+                    ViscaProtocol.DefaultSocketId,
+                    msg => LogMessage(msg));
+
+                _inquiryStopEvent.Reset();
+                _inquiryRunning = true;
+                _inquiryThread = new Thread(InquiryLoop)
+                {
+                    IsBackground = true,
+                    Name = "ViscaInquiryPolling"
+                };
+                _inquiryThread.Start();
+                LogMessage(
+                    $"Inquiry polling started: {realCameraIp}:{realCameraPort}, interval={Mathf.Max(20, inquiryPollingIntervalMs)}ms, timeout={Mathf.Max(1, inquiryTimeoutMs)}ms, retries={Mathf.Max(0, inquiryRetryCount)}");
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[VISCA] Failed to start inquiry polling: {e.Message}");
+                StopInquiryPolling();
+            }
+        }
+
+        private void StopInquiryPolling()
+        {
+            _inquiryRunning = false;
+            _inquiryStopEvent.Set();
+
+            var thread = _inquiryThread;
+            _inquiryThread = null;
+            if (thread != null && thread.IsAlive && thread != Thread.CurrentThread)
+                thread.Join(500);
+
+            _inquiryClient?.Dispose();
+            _inquiryClient = null;
+        }
+
+        private void InquiryLoop()
+        {
+            while (_inquiryRunning)
+            {
+                var startTick = Environment.TickCount;
+                try
+                {
+                    if (_inquiryClient != null && _inquiryClient.TryGetStatus(out var status))
+                    {
+                        _mainThreadActions.Enqueue(() =>
+                        {
+                            if (!_inquiryRunning || !applyInquiryToVirtualCamera)
+                                return;
+                            if (ptzController == null)
+                                return;
+
+                            ptzController.ApplyInquiryStatus(in status);
+                        });
+                    }
+                }
+                catch (Exception e)
+                {
+                    LogMessage($"Inquiry polling error: {e.Message}");
+                }
+
+                var elapsedMs = (int)((uint)Environment.TickCount - (uint)startTick);
+                var intervalMs = Mathf.Max(20, inquiryPollingIntervalMs);
+                var waitMs = Math.Max(0, intervalMs - elapsedMs);
+                if (_inquiryStopEvent.Wait(waitMs))
+                    break;
+            }
         }
 
         private void StartIpSetupResponder(IPAddress viscaBindAddress)
