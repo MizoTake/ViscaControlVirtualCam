@@ -325,6 +325,52 @@ public class PtzModelTests
     }
 
     [Test]
+    public void SyncFromViscaPositions_MapsRawToPose()
+    {
+        var m = new PtzModel
+        {
+            PanMinDeg = -170f,
+            PanMaxDeg = 170f,
+            TiltMinDeg = -30f,
+            TiltMaxDeg = 90f,
+            MinFov = 15f,
+            MaxFov = 90f
+        };
+
+        m.SyncFromViscaPositions(0xFFFF, 0x0000, 0x8000);
+
+        Assert.That(m.CurrentPanDeg, Is.EqualTo(170f).Within(0.01f));
+        Assert.That(m.CurrentTiltDeg, Is.EqualTo(-30f).Within(0.01f));
+        Assert.That(m.CurrentFovDeg, Is.EqualTo(m.GetFovFromZoomPosition(0x8000)).Within(0.01f));
+    }
+
+    [Test]
+    public void SyncFromViscaPositions_ClearsVelocityAndTargets()
+    {
+        var m = new PtzModel
+        {
+            PanMinDeg = -170f,
+            PanMaxDeg = 170f,
+            TiltMinDeg = -30f,
+            TiltMaxDeg = 90f,
+            MinFov = 15f,
+            MaxFov = 90f,
+            UseAccelerationLimit = false
+        };
+
+        m.CommandPanTiltVariable(0x18, 0x18, AxisDirection.Positive, AxisDirection.Positive);
+        m.CommandZoomVariable(0x27);
+        _ = m.Step(0f, 0f, 60f, 0.1f);
+
+        m.SyncFromViscaPositions(0x9000, 0x7000, 0x2000);
+        var step = m.Step(m.CurrentPanDeg, m.CurrentTiltDeg, m.CurrentFovDeg, 0.2f);
+
+        Assert.That(step.DeltaYawDeg, Is.EqualTo(0f).Within(0.001f));
+        Assert.That(step.DeltaPitchDeg, Is.EqualTo(0f).Within(0.001f));
+        Assert.IsFalse(step.HasNewFov);
+    }
+
+    [Test]
     public void MemoryPreset_PersistsAcrossInstances()
     {
         var prefs = new MockPlayerPrefsAdapter();

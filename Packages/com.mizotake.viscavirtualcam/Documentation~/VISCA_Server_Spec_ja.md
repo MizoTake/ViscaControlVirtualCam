@@ -226,6 +226,7 @@
 - ACK/Completion/Error はソケット nibble（`Z`）を必ず反映 (`90 4Z/5Z/6Z ... FF`)。Raw VISCA 受信時の既定 `Z=1`。
 - Command Cancel (`8X 2Z FF`) に対応し、即時に `90 6Z 04 FF` を返す。ソケット番号は `2Z` バイトから抽出。
 - RM-IP500 互換向けに `Interface Clear(8X 01 00 01 FF)`、`Camera Power(8X 01 04 00 02/03 FF)`、`Power Inquiry(8X 09 04 00 FF)`、`Version Inquiry(8X 09 00 02 FF)` を実装。
+- 実機同期向け Inquiry Polling を追加。`Pan/Tilt Position Inquiry(8X 09 06 12 FF)` と `Zoom Position Inquiry(8X 09 04 47 FF)` を UDP で周期送信し、返信 (`0x01 0x11`) のシーケンス一致時のみ Unity リグへ同期反映する。
 - VISCA over IP の Payload Length は 1〜16 を厳格に検証し、超過/不一致は `Message Length(0x01)` で応答。
 - バッファ満杯時は `Buffer Full(0x03)` を返却（内部キュー上限超過時）。状態不整合や処理不能例外時は `Not Executable(0x41)` を返す。
 - 構文不正/長さ超過時は Syntax(0x02) を返却。
@@ -240,6 +241,19 @@
 - `Linked`:
   - 受信パケットを実機に UDP 転送しつつ、Unity 側でも同じコマンドを実行。
   - 応答は実機リレーのみ返し、Unity 側応答は抑止（重複応答を防止）。
+
+### Inquiry Polling（実機状態取得）
+- 目的:
+  - 実機が別コントローラーから操作された場合でも、Unity の仮想 PTZ リグを追従させる。
+- 送信:
+  - `8X 09 06 12 FF`（Pan/Tilt 位置）
+  - `8X 09 04 47 FF`（Zoom 位置）
+  - VISCA over IP ヘッダ (`0x01 0x10`) を付与して UDP 送信する。
+- 受信:
+  - `0x01 0x11` Reply のみ対象。シーケンス番号一致を必須とし、タイムアウト時は同一シーケンスで再送する。
+  - `0p/0t/0z` は下位ニブルを連結して 16bit 値として復元する。
+- 反映:
+  - 復元した Pan/Tilt/Zoom を `PtzModel.SyncFromViscaPositions(...)` で Unity 側状態に反映し、余剰速度・目標キューをクリアして追従ズレを抑える。
 
 ## Raw VISCA（Serial 互換）モード（TCP）
 - 概要
