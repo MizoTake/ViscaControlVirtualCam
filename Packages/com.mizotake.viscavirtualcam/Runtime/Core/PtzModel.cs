@@ -165,7 +165,7 @@ namespace ViscaControlVirtualCam
             var vPan = PtzMathUtils.MapSpeed(vv, PanVmin, PanVmax, panMin, panMax, SpeedGamma);
             var vTilt = PtzMathUtils.MapSpeed(ww, TiltVmin, TiltVmax, tiltMin, tiltMax, SpeedGamma);
             var panSign = panDir == AxisDirection.Positive ? 1f : -1f;
-            var tiltSign = tiltDir == AxisDirection.Positive ? 1f : -1f;
+            var tiltSign = tiltDir == AxisDirection.Positive ? -1f : 1f;
             if (InvertPan) panSign *= -1f;
             if (InvertTilt) tiltSign *= -1f;
 
